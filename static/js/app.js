@@ -138,26 +138,98 @@ function openModal(title, contentHtml, onSave) {
     return overlay;
 }
 
-// --- 主题切换 ---
+// --- 主题系统: 8 套配色 × 亮/暗/自动 ---
+const COLOR_THEMES = [
+    { id: 'teal',    name: '青绿', color: '#0d9488' },
+    { id: 'blue',    name: '深蓝', color: '#2563eb' },
+    { id: 'indigo',  name: '靛紫', color: '#6366f1' },
+    { id: 'emerald', name: '墨绿', color: '#059669' },
+    { id: 'slate',   name: '灰蓝', color: '#4b6584' },
+    { id: 'amber',   name: '琥珀', color: '#d97706' },
+    { id: 'rose',    name: '玫红', color: '#e11d48' },
+    { id: 'violet',  name: '紫罗兰', color: '#7c3aed' },
+];
+
 (function initTheme() {
-    const saved = localStorage.getItem('dfmea-theme');
-    if (saved === 'light' || saved === 'dark') {
-        document.documentElement.setAttribute('data-theme', saved);
+    const color = localStorage.getItem('dfmea-color-theme');
+    if (color) {
+        document.documentElement.setAttribute('data-color-theme', color);
+    }
+    const mode = localStorage.getItem('dfmea-mode');
+    if (mode === 'light' || mode === 'dark') {
+        document.documentElement.setAttribute('data-theme', mode);
     }
 })();
 
-function cycleTheme() {
-    const themes = ['auto', 'light', 'dark'];
-    const current = localStorage.getItem('dfmea-theme') || 'auto';
-    const next = themes[(themes.indexOf(current) + 1) % themes.length];
+function setColorTheme(id) {
+    document.documentElement.setAttribute('data-color-theme', id);
+    localStorage.setItem('dfmea-color-theme', id);
+}
 
-    if (next === 'auto') {
+function setModeTheme(mode) {
+    if (mode === 'auto') {
         document.documentElement.removeAttribute('data-theme');
-        localStorage.removeItem('dfmea-theme');
+        localStorage.removeItem('dfmea-mode');
     } else {
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('dfmea-theme', next);
+        document.documentElement.setAttribute('data-theme', mode);
+        localStorage.setItem('dfmea-mode', mode);
     }
+}
+
+function getActiveColorTheme() {
+    return document.documentElement.getAttribute('data-color-theme') || 'teal';
+}
+
+function getActiveMode() {
+    return document.documentElement.getAttribute('data-theme') || 'auto';
+}
+
+function cycleTheme() { setModeTheme({ auto: 'light', light: 'dark', dark: 'auto' }[getActiveMode()] || 'auto'); }
+
+function openThemePalette(event) {
+    const existing = document.querySelector('.theme-palette-popover');
+    if (existing) { existing.remove(); return; }
+
+    const popover = document.createElement('div');
+    popover.className = 'theme-palette-popover';
+
+    const activeColor = getActiveColorTheme();
+    const activeMode = getActiveMode();
+
+    COLOR_THEMES.forEach(t => {
+        const swatch = document.createElement('div');
+        swatch.className = 'theme-swatch' + (t.id === activeColor ? ' active' : '');
+        swatch.innerHTML = `<span class="swatch-dot" style="background:${t.color}"></span>${t.name}`;
+        swatch.onclick = () => { setColorTheme(t.id); popover.remove(); };
+        popover.appendChild(swatch);
+    });
+
+    const modeRow = document.createElement('div');
+    modeRow.className = 'theme-swatch-darkmode';
+    ['auto', 'light', 'dark'].forEach(m => {
+        const btn = document.createElement('button');
+        btn.textContent = { auto: '自动', light: '☀️ 亮', dark: '🌙 暗' }[m];
+        btn.className = (m === activeMode ? 'active' : '');
+        btn.onclick = () => setModeTheme(m);
+        modeRow.appendChild(btn);
+    });
+    popover.appendChild(modeRow);
+
+    document.body.appendChild(popover);
+
+    // position near the button
+    const rect = event.target.getBoundingClientRect();
+    popover.style.top = (rect.bottom + 6) + 'px';
+    popover.style.right = (window.innerWidth - rect.right) + 'px';
+
+    // close on outside click
+    const close = (e) => {
+        if (!popover.contains(e.target) && e.target !== event.target) {
+            popover.remove();
+            document.removeEventListener('click', close);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', close), 0);
 }
 
 // --- 确认对话框 ---

@@ -4,7 +4,7 @@
     <header class="app-header">
         <a href="/" class="btn btn-ghost btn-sm">← 返回</a>
         <span class="text-muted" style="font-size:.8rem">[[ project.name ]]</span>
-        <button class="theme-toggle" onclick="cycleTheme()" title="切换主题" style="margin-left:.5rem">☀️ / 🌙</button>
+        <button class="theme-palette-btn" onclick="openThemePalette(event)" title="切换配色主题" style="margin-left:.5rem"></button>
         <span class="sep"></span>
         <nav class="tabs">
             <span class="tab-item" :class="{ active: tab === 'structure' }" @click="tab = 'structure'">结构树</span>
@@ -143,13 +143,13 @@
                                     <td title="[[ f.function_desc ]]">[[ truncate(f.function_desc, 20) ]]</td>
                                     <td title="[[ f.mode_desc ]]" @dblclick="editDfmea(f)">[[ truncate(f.mode_desc, 25) ]]</td>
                                     <td title="[[ f.potential_effect ]]">[[ truncate(f.potential_effect, 25) ]]</td>
-                                    <td><span class="tag" :class="'tag-' + (f.severity_S >= 7 ? 'h' : f.severity_S >= 4 ? 'm' : 'l')">[[ f.severity_S ]]</span></td>
+                                    <td style="text-align:center"><span class="score-dot" :class="'score-' + (f.severity_S >= 7 ? 'h' : f.severity_S >= 4 ? 'm' : 'l')">[[ f.severity_S ]]</span></td>
                                     <td>[[ f.classification || '-' ]]</td>
                                     <td title="[[ f.potential_cause ]]">[[ truncate(f.potential_cause, 20) ]]</td>
-                                    <td><span class="tag" :class="'tag-' + (f.occurrence_O >= 7 ? 'h' : f.occurrence_O >= 4 ? 'm' : 'l')">[[ f.occurrence_O ]]</span></td>
+                                    <td style="text-align:center"><span class="score-dot" :class="'score-' + (f.occurrence_O >= 7 ? 'h' : f.occurrence_O >= 4 ? 'm' : 'l')">[[ f.occurrence_O ]]</span></td>
                                     <td title="[[ f.prevention_control ]]">[[ truncate(f.prevention_control, 20) ]]</td>
                                     <td title="[[ f.detection_control ]]">[[ truncate(f.detection_control, 20) ]]</td>
-                                    <td><span class="tag" :class="'tag-' + (f.detection_D >= 7 ? 'h' : f.detection_D >= 4 ? 'm' : 'l')">[[ f.detection_D ]]</span></td>
+                                    <td style="text-align:center"><span class="score-dot" :class="'score-' + (f.detection_D >= 7 ? 'h' : f.detection_D >= 4 ? 'm' : 'l')">[[ f.detection_D ]]</span></td>
                                     <td><span class="tag" :class="'tag-' + rpnLevel(f.rpn).toLowerCase()" style="font-weight:700">[[ f.rpn ]]</span></td>
                                     <td><span class="tag" :class="'tag-' + f.action_priority.toLowerCase()">[[ f.action_priority ]]</span></td>
                                     <td title="[[ f.recommended_action ]]">[[ truncate(f.recommended_action, 20) ]]</td>
@@ -314,183 +314,231 @@
     </div>
 
     <!-- DFMEA 编辑模态框 -->
-    <!-- DFMEA 编辑模态框 -->
     <div v-if="showDfmeaModal" class="modal-overlay" @click.self="showDfmeaModal=false">
-        <div class="modal" style="max-width:760px;min-width:600px">
-            <h2>[[ editingDfmea ? '编辑失效模式' : '添加失效模式' ]]</h2>
+        <div class="modal" style="max-width:960px;min-width:820px;padding:0;overflow:hidden">
+            <!-- Header -->
+            <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem">
+                <h2 style="margin:0;flex:1">[[ editingDfmea ? '编辑失效模式' : '添加失效模式' ]]</h2>
+                <button class="btn btn-ghost btn-sm" @click="showDfmeaModal=false">✕</button>
+            </div>
 
-            <!-- 快速填充 -->
-            <div class="form-group" v-if="!editingDfmea && allFailuresForFill.length > 0">
-                <label>从已有失效模式快速填充</label>
-                <select @change="quickFillDfmea($event.target.value)">
+            <!-- Quick fill (add mode only) -->
+            <div style="padding:.75rem 1.5rem;border-bottom:1px solid var(--border-light);background:var(--bg)" v-if="!editingDfmea && allFailuresForFill.length > 0">
+                <label style="font-size:.8rem;font-weight:600;color:var(--text-secondary);margin-right:.5rem">快速填充:</label>
+                <select @change="quickFillDfmea($event.target.value)" style="font-size:.82rem;min-width:320px">
                     <option value="">— 选择已有失效模式 —</option>
                     <option v-for="f in allFailuresForFill" :key="f.id" :value="f.id">[[ f.mode_desc ]] ([[ truncate(f.function_desc,20) ]])</option>
                 </select>
             </div>
 
-            <!-- 功能项 & 失效模式 -->
-            <div class="form-row">
-                <div class="form-group" style="flex:1">
-                    <label>关联功能项 <span style="color:var(--danger)">*</span></label>
-                    <select v-model="dfmeaForm.function_item_id" :disabled="!!editingDfmea">
-                        <option v-for="fn in functionsForDfmea" :key="fn.id" :value="fn.id">[[ fn.function_desc ]]</option>
-                    </select>
-                </div>
-                <div class="form-group" style="flex:1.5">
-                    <label>失效模式</label>
-                    <input v-model="dfmeaForm.mode_desc" placeholder="描述失效的表现形式">
-                </div>
-            </div>
+            <!-- Body: two columns -->
+            <div class="modal-dfmea" style="padding:1.25rem 1.5rem;max-height:62vh;overflow-y:auto">
+                <!-- LEFT COLUMN -->
+                <div class="modal-dfmea-left">
+                    <!-- Section: Basic Info -->
+                    <div class="section-card">
+                        <div class="section-title">基本信息</div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>关联功能项 <span style="color:var(--danger)">*</span></label>
+                                <select v-model="dfmeaForm.function_item_id" :disabled="!!editingDfmea">
+                                    <option v-for="fn in functionsForDfmea" :key="fn.id" :value="fn.id">[[ fn.function_desc ]]</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:1.5">
+                                <label>失效模式</label>
+                                <input v-model="dfmeaForm.mode_desc" placeholder="描述失效的表现形式">
+                            </div>
+                        </div>
+                    </div>
 
-            <!-- 失效影响：对当前元素 + 对系统 -->
-            <div class="form-row">
-                <div class="form-group" style="flex:1">
-                    <label>失效影响 — 对当前元素</label>
-                    <input v-model="dfmeaForm.local_effect" placeholder="对当前部件/子系统的影响">
+                    <!-- Section: Effects -->
+                    <div class="section-card">
+                        <div class="section-title">失效影响</div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>对当前元素</label>
+                                <input v-model="dfmeaForm.local_effect" placeholder="对当前部件/子系统的影响">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>对系统 / 整机</label>
+                                <input v-model="dfmeaForm.potential_effect" placeholder="对上层系统或最终客户的影响">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: Causes (chips) -->
+                    <div class="section-card">
+                        <div class="section-title">失效原因</div>
+                        <div class="chip-list" v-if="dfmeaItems.potential_cause.filter(s=>s.trim()).length > 0">
+                            <span class="chip" v-for="(item, i) in dfmeaItems.potential_cause" :key="'c'+i" v-show="item.trim()">
+                                <span class="chip-text" :title="item">[[ item ]]</span>
+                                <span class="chip-remove" @click="dfmeaItems.potential_cause.splice(i,1); onDfmeaItemChange()">×</span>
+                            </span>
+                        </div>
+                        <div class="chip-add-row">
+                            <input v-model="newCause" placeholder="输入失效原因后按回车添加..."
+                                @keyup.enter="if(newCause.trim()){ dfmeaItems.potential_cause.push(newCause.trim()); newCause=''; onDfmeaItemChange(); }">
+                            <button class="btn btn-primary btn-sm"
+                                @click="if(newCause.trim()){ dfmeaItems.potential_cause.push(newCause.trim()); newCause=''; onDfmeaItemChange(); }">添加</button>
+                        </div>
+                    </div>
+
+                    <!-- Section: Prevention (chips) -->
+                    <div class="section-card">
+                        <div class="section-title">预防控制 <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.75rem">— 防止失效原因发生</span></div>
+                        <div class="chip-list" v-if="dfmeaItems.prevention_control.filter(s=>s.trim()).length > 0">
+                            <span class="chip" v-for="(item, i) in dfmeaItems.prevention_control" :key="'p'+i" v-show="item.trim()">
+                                <span class="chip-text" :title="item">[[ item ]]</span>
+                                <span class="chip-remove" @click="dfmeaItems.prevention_control.splice(i,1); onDfmeaItemChange()">×</span>
+                            </span>
+                        </div>
+                        <div class="chip-add-row">
+                            <input v-model="newPrevention" placeholder="输入预防措施后按回车添加..."
+                                @keyup.enter="if(newPrevention.trim()){ dfmeaItems.prevention_control.push(newPrevention.trim()); newPrevention=''; onDfmeaItemChange(); }">
+                            <button class="btn btn-primary btn-sm"
+                                @click="if(newPrevention.trim()){ dfmeaItems.prevention_control.push(newPrevention.trim()); newPrevention=''; onDfmeaItemChange(); }">添加</button>
+                        </div>
+                    </div>
+
+                    <!-- Section: Detection (chips with category) -->
+                    <div class="section-card">
+                        <div class="section-title">探测控制 <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.75rem">— 选择阶段 + 具体方法</span></div>
+                        <div class="chip-list" v-if="dfmeaItems.detection_control.filter(s=>s.trim()).length > 0">
+                            <span class="chip" v-for="(item, i) in dfmeaItems.detection_control" :key="'d'+i" v-show="item.trim()">
+                                <span v-if="getDetectCat(item)" class="tag" style="font-size:.65rem;margin-right:2px;background:var(--primary-light);color:var(--primary-text);flex-shrink:0">[[ getDetectCat(item) ]]</span>
+                                <span class="chip-text" :title="item">[[ item.replace(/^\[.*?\]\s?/, '') ]]</span>
+                                <span class="chip-remove" @click="dfmeaItems.detection_control.splice(i,1); onDfmeaItemChange()">×</span>
+                            </span>
+                        </div>
+                        <div class="chip-add-row">
+                            <select v-model="newDetectCat" style="flex:0 0 110px;font-size:.8rem;padding:.3rem .35rem">
+                                <option value="">— 阶段 —</option>
+                                <option>设计分析</option><option>验证测试</option><option>过程检测</option><option>下线检测</option>
+                            </select>
+                            <input v-model="newDetection" placeholder="具体探测方法..."
+                                @keyup.enter="if(newDetection.trim()){ const prefix = newDetectCat ? '['+newDetectCat+'] ' : ''; dfmeaItems.detection_control.push(prefix + newDetection.trim()); newDetection=''; newDetectCat=''; onDfmeaItemChange(); }">
+                            <button class="btn btn-primary btn-sm"
+                                @click="if(newDetection.trim()){ const prefix = newDetectCat ? '['+newDetectCat+'] ' : ''; dfmeaItems.detection_control.push(prefix + newDetection.trim()); newDetection=''; newDetectCat=''; onDfmeaItemChange(); }">添加</button>
+                        </div>
+                    </div>
+
+                    <!-- Section: Recommended Actions (chips) -->
+                    <div class="section-card">
+                        <div class="section-title">建议措施 <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.75rem">— 针对高风险项的改进措施</span></div>
+                        <div class="chip-list" v-if="dfmeaItems.recommended_action.filter(s=>s.trim()).length > 0">
+                            <span class="chip" v-for="(item, i) in dfmeaItems.recommended_action" :key="'r'+i" v-show="item.trim()">
+                                <span class="chip-text" :title="item">[[ item ]]</span>
+                                <span class="chip-remove" @click="dfmeaItems.recommended_action.splice(i,1); onDfmeaItemChange()">×</span>
+                            </span>
+                        </div>
+                        <div class="chip-add-row">
+                            <input v-model="newAction" placeholder="输入改进措施后按回车添加..."
+                                @keyup.enter="if(newAction.trim()){ dfmeaItems.recommended_action.push(newAction.trim()); newAction=''; onDfmeaItemChange(); }">
+                            <button class="btn btn-primary btn-sm"
+                                @click="if(newAction.trim()){ dfmeaItems.recommended_action.push(newAction.trim()); newAction=''; onDfmeaItemChange(); }">添加</button>
+                        </div>
+                    </div>
+
+                    <!-- Section: Action Management -->
+                    <div class="section-card">
+                        <div class="section-title">措施管理</div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1"><label>责任人</label><input v-model="dfmeaForm.action_owner" placeholder="负责人"></div>
+                            <div class="form-group" style="flex:0 0 130px"><label>期限</label><input type="date" v-model="dfmeaForm.action_due_date"></div>
+                            <div class="form-group" style="flex:0 0 110px"><label>状态</label><select v-model="dfmeaForm.action_status"><option>未开始</option><option>进行中</option><option>已完成</option><option>已取消</option></select></div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0"><label>措施效果</label><input v-model="dfmeaForm.action_effect" placeholder="措施实施后的验证结果"></div>
+                    </div>
+
+                    <!-- Collapsible: Revised Scores + References -->
+                    <details style="margin-bottom:.5rem">
+                        <summary style="font-size:.84rem;color:var(--text-secondary);cursor:pointer;font-weight:600;padding:.3rem 0">修订评分 & 参考资料关联</summary>
+                        <div style="margin-top:.5rem">
+                            <div class="section-card">
+                                <div class="section-title">修订评分（措施实施后）</div>
+                                <div class="form-row">
+                                    <div class="form-group" style="flex:1"><label>修订S</label><input v-model.number="dfmeaForm.revised_S" type="number" min="1" max="10" placeholder="1-10"></div>
+                                    <div class="form-group" style="flex:1"><label>修订O</label><input v-model.number="dfmeaForm.revised_O" type="number" min="1" max="10" placeholder="1-10"></div>
+                                    <div class="form-group" style="flex:1"><label>修订D</label><input v-model.number="dfmeaForm.revised_D" type="number" min="1" max="10" placeholder="1-10"></div>
+                                    <div class="form-group" style="flex:2"><label>修订RPN</label><input v-model.number="dfmeaForm.revised_RPN" type="number" placeholder="手动输入修订后RPN"></div>
+                                </div>
+                            </div>
+                            <div class="section-card">
+                                <div class="section-title">关联参考资料 <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.75rem">([[ dfmeaSelectedRefIds.length ]] 项已选)</span></div>
+                                <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem" v-if="dfmeaSelectedRefIds.length > 0">
+                                    <span v-for="rid in dfmeaSelectedRefIds" :key="rid" class="tag"
+                                        style="font-size:.75rem;cursor:pointer;background:var(--primary);color:#fff;display:inline-flex;align-items:center;gap:.3rem"
+                                        @click="dfmeaSelectedRefIds = dfmeaSelectedRefIds.filter(id => id !== rid)">
+                                        [[ getRefTitle(rid) ]]
+                                        <span style="opacity:.7;font-weight:700">×</span>
+                                    </span>
+                                </div>
+                                <input type="text" v-model="refSearchText" placeholder="输入关键词搜索参考资料..."
+                                    style="width:100%;font-size:.8rem;margin-bottom:.3rem">
+                                <div v-if="filteredRefs.length > 0"
+                                    style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)">
+                                    <label v-for="ref in filteredRefs" :key="ref.id"
+                                        style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem;font-size:.78rem;cursor:pointer;border-bottom:1px dotted var(--border)">
+                                        <input type="checkbox" :value="ref.id" v-model="dfmeaSelectedRefIds" style="width:auto;flex-shrink:0">
+                                        <span style="flex-shrink:0;font-size:.68rem;color:var(--text-secondary);min-width:44px">[[ ref.type ]]</span>
+                                        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">[[ ref.title ]]</span>
+                                        <span v-if="ref.node_name" style="font-size:.65rem;color:var(--text-secondary);flex-shrink:0">[[ ref.node_name ]]</span>
+                                    </label>
+                                </div>
+                                <div v-else-if="refSearchText && projectReferences.length > 0" class="text-muted" style="font-size:.75rem;padding:.2rem .3rem">无匹配结果</div>
+                                <div v-else-if="projectReferences.length === 0" class="text-muted" style="font-size:.75rem;padding:.2rem 0">暂无参考材料，请先在"参考材料"Tab 中上传</div>
+                            </div>
+                        </div>
+                    </details>
                 </div>
-                <div class="form-group" style="flex:1">
-                    <label>失效影响 — 对系统/整机</label>
-                    <input v-model="dfmeaForm.potential_effect" placeholder="对上层系统或最终客户的影响">
-                </div>
-            </div>
 
-            <!-- S + 分类 + O -->
-            <div class="form-row" style="align-items:end">
-                <div class="form-group" style="flex:0 0 90px"><label>严重度 S</label><select v-model="dfmeaForm.severity_S"><option v-for="n in sodOptions" :key="n" :value="n">[[ n ]]</option></select></div>
-                <div class="form-group" style="flex:0 0 130px">
-                    <label>特殊特性
-                        <span class="field-hint" title="SC=重要特性(影响安全/法规/配合/功能/性能)&#10;CC=关键特性(影响安全/法规)">?</span>
-                    </label>
-                    <select v-model="dfmeaForm.classification"><option value="">—</option><option value="SC">SC 重要特性</option><option value="CC">CC 关键特性</option></select>
-                </div>
-                <div class="form-group" style="flex:0 0 90px"><label>频度 O</label><select v-model="dfmeaForm.occurrence_O"><option v-for="n in sodOptions" :key="n" :value="n">[[ n ]]</option></select></div>
-                <div class="form-group" style="flex:1"><label>探测度 D</label><select v-model="dfmeaForm.detection_D"><option v-for="n in sodOptions" :key="n" :value="n">[[ n ]]</option></select></div>
-            </div>
+                <!-- RIGHT COLUMN: Scoring Panel -->
+                <div class="modal-dfmea-right">
+                    <div class="scoring-panel">
+                        <div style="font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem">评分面板</div>
+                        <div class="score-row"><label>S</label><select v-model="dfmeaForm.severity_S"><option v-for="n in sodOptions" :key="n" :value="n">[[ n ]]</option></select></div>
+                        <div class="score-row"><label>O</label><select v-model="dfmeaForm.occurrence_O"><option v-for="n in sodOptions" :key="n" :value="n">[[ n ]]</option></select></div>
+                        <div class="score-row"><label>D</label><select v-model="dfmeaForm.detection_D"><option v-for="n in sodOptions" :key="n" :value="n">[[ n ]]</option></select></div>
 
-            <!-- RPN / AP 实时计算 -->
-            <div class="rpn-preview">
-                <span>RPN = [[ dfmeaForm.severity_S ]] × [[ dfmeaForm.occurrence_O ]] × [[ dfmeaForm.detection_D ]] = </span>
-                <span :class="'tag tag-' + rpnLevel(calcRPN(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D)).toLowerCase()" style="font-size:.95rem;font-weight:700">[[ calcRPN(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D) ]]</span>
-                <span style="margin-left:1.5rem">AP = </span>
-                <span :class="'tag tag-' + calcAP(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D).toLowerCase()" style="font-size:.95rem;font-weight:700">[[ calcAP(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D) ]]</span>
-            </div>
+                        <div class="form-group" style="margin-top:.5rem;margin-bottom:0">
+                            <label>特殊特性
+                                <span class="field-hint" title="SC=重要特性(影响安全/法规/配合/功能/性能)&#10;CC=关键特性(影响安全/法规)">?</span>
+                            </label>
+                            <select v-model="dfmeaForm.classification"><option value="">—</option><option value="SC">SC 重要特性</option><option value="CC">CC 关键特性</option></select>
+                        </div>
 
-            <!-- 失效原因（多条目） -->
-            <div class="multi-field">
-                <label>失效原因 <span class="text-muted">（可添加多条）</span></label>
-                <div v-for="(item, i) in dfmeaItems.potential_cause" :key="'c'+i" class="item-row">
-                    <input v-model="dfmeaItems.potential_cause[i]" placeholder="失效原因..." @change="onDfmeaItemChange">
-                    <button class="btn btn-ghost btn-sm" @click="dfmeaItems.potential_cause.splice(i,1); onDfmeaItemChange()" title="删除">×</button>
-                </div>
-                <button class="add-item-btn" @click="dfmeaItems.potential_cause.push('')">+ 添加原因</button>
-            </div>
+                        <!-- RPN Display -->
+                        <div class="rpn-display">
+                            <div class="rpn-formula">[[ dfmeaForm.severity_S ]] × [[ dfmeaForm.occurrence_O ]] × [[ dfmeaForm.detection_D ]]</div>
+                            <div class="rpn-value" :class="'text-' + rpnLevel(calcRPN(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D)).toLowerCase()"
+                                :style="{ color: calcRPN(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D) >= 200 ? 'var(--rpn-high-text)' : calcRPN(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D) >= 100 ? 'var(--rpn-mid-text)' : 'var(--success)' }">
+                                [[ calcRPN(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D) ]]
+                            </div>
+                            <div class="rpn-ap">
+                                措施优先级 <span class="tag" :class="'tag-' + calcAP(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D).toLowerCase()">[[ calcAP(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D) ]]</span>
+                            </div>
+                        </div>
 
-            <!-- 预防控制（多条目） -->
-            <div class="multi-field">
-                <label>预防控制 <span class="text-muted">（防止失效原因发生的措施）</span></label>
-                <div v-for="(item, i) in dfmeaItems.prevention_control" :key="'p'+i" class="item-row">
-                    <input v-model="dfmeaItems.prevention_control[i]" placeholder="预防控制..." @change="onDfmeaItemChange">
-                    <button class="btn btn-ghost btn-sm" @click="dfmeaItems.prevention_control.splice(i,1); onDfmeaItemChange()" title="删除">×</button>
-                </div>
-                <button class="add-item-btn" @click="dfmeaItems.prevention_control.push('')">+ 添加预防控制</button>
-            </div>
-
-            <!-- 探测控制（多条目，分类+具体方法） -->
-            <div class="multi-field">
-                <label>探测控制 <span class="text-muted">（选择探测阶段 + 具体方法）</span></label>
-                <div v-for="(item, i) in dfmeaItems.detection_control" :key="'d'+i" class="item-row">
-                    <select :value="getDetectCat(dfmeaItems.detection_control[i])"
-                        @change="setDetectCat(dfmeaItems.detection_control, i, $event.target.value)"
-                        style="flex:0 0 120px;margin-right:.3rem">
-                        <option value="">— 阶段 —</option>
-                        <option>设计分析</option><option>验证测试</option><option>过程检测</option><option>下线检测</option>
-                    </select>
-                    <span class="text-muted" style="font-size:.75rem;margin-right:.2rem" v-if="getDetectCat(dfmeaItems.detection_control[i])">→</span>
-                    <input v-model="dfmeaItems.detection_control[i]" placeholder="具体探测方法..." @change="onDfmeaItemChange" style="flex:1">
-                    <button class="btn btn-ghost btn-sm" @click="dfmeaItems.detection_control.splice(i,1); onDfmeaItemChange()" title="删除">×</button>
-                </div>
-                <button class="add-item-btn" @click="dfmeaItems.detection_control.push('')">+ 添加探测控制</button>
-            </div>
-
-            <!-- 建议措施（多条目） -->
-            <div class="multi-field">
-                <label>建议措施 <span class="text-muted">（针对高风险项的改进措施）</span></label>
-                <div v-for="(item, i) in dfmeaItems.recommended_action" :key="'r'+i" class="item-row">
-                    <input v-model="dfmeaItems.recommended_action[i]" placeholder="改进措施..." @change="onDfmeaItemChange">
-                    <button class="btn btn-ghost btn-sm" @click="dfmeaItems.recommended_action.splice(i,1); onDfmeaItemChange()" title="删除">×</button>
-                </div>
-                <button class="add-item-btn" @click="dfmeaItems.recommended_action.push('')">+ 添加建议措施</button>
-            </div>
-
-            <!-- 措施管理 -->
-            <div class="form-row">
-                <div class="form-group" style="flex:1"><label>责任人</label><input v-model="dfmeaForm.action_owner" placeholder="负责人"></div>
-                <div class="form-group" style="flex:0 0 130px"><label>期限</label><input type="date" v-model="dfmeaForm.action_due_date"></div>
-                <div class="form-group" style="flex:0 0 120px"><label>状态</label><select v-model="dfmeaForm.action_status"><option>未开始</option><option>进行中</option><option>已完成</option><option>已取消</option></select></div>
-            </div>
-            <div class="form-group"><label>措施效果</label><input v-model="dfmeaForm.action_effect" placeholder="措施实施后的验证结果"></div>
-
-            <!-- 评分准则（内嵌参考） -->
-            <details style="margin-bottom:.5rem"><summary style="font-size:.85rem;color:var(--primary);cursor:pointer;font-weight:600" @click="loadCriteria()">S/O/D 评分准则 & AP 矩阵（点击展开）</summary>
-            <div style="display:flex;gap:1rem;margin-top:.5rem;flex-wrap:wrap" v-if="criteria.S.length">
-                <div v-for="t in ['S','O','D']" :key="t" style="flex:1;min-width:200px">
-                    <div style="font-size:.75rem;font-weight:700;margin-bottom:.2rem;color:var(--primary)">[[ t==='S'?'严重度 S':t==='O'?'频度 O':'探测度 D' ]]</div>
-                    <div v-for="c in criteria[t]" :key="c.score" style="font-size:.7rem;padding:1px 0;border-bottom:1px dotted var(--border);display:flex;gap:.3rem">
-                        <span style="font-weight:700;width:18px;flex-shrink:0">[[ c.score ]]</span>
-                        <span style="color:var(--text-secondary)">[[ c.title ]]</span>
+                        <!-- Scoring Criteria (always visible, scrollable) -->
+                        <div class="score-ref-inline" v-if="criteria.S.length">
+                            <div v-for="t in ['S','O','D']" :key="t" style="margin-bottom:.3rem">
+                                <div style="font-weight:700;margin-bottom:2px;color:var(--primary);font-size:.68rem">[[ t==='S'?'严重度 S':t==='O'?'频度 O':'探测度 D' ]]</div>
+                                <div v-for="c in criteria[t]" :key="c.score" class="ref-row">
+                                    <span class="ref-score">[[ c.score ]]</span>
+                                    <span>[[ c.title ]]</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button v-else class="btn btn-ghost btn-sm" @click="loadCriteria()" style="width:100%;margin-top:.5rem;font-size:.78rem">
+                            加载 S/O/D 评分准则
+                        </button>
                     </div>
                 </div>
             </div>
-            <div style="margin-top:.75rem;font-size:.75rem;color:var(--text-secondary)">
-                <div style="font-weight:700;color:var(--primary);margin-bottom:.2rem">AP 措施优先级判定</div>
-                <p>AP = H（高）：必须制定改进措施 | AP = M（中）：应制定改进措施 | AP = L（低）：可接受，无需强制措施</p>
-                <p>AP 依据 S、O、D 组合自动判定（AIAG-VDA 矩阵），优先降低 S，其次 O，最后 D</p>
-            </div>
-            </details>
 
-            <!-- 修订评分 -->
-            <details style="margin-bottom:.5rem"><summary style="font-size:.85rem;color:var(--text-secondary);cursor:pointer">修订评分（措施实施后）</summary>
-            <div class="form-row" style="color:var(--text-secondary);font-size:.85rem;margin-top:.5rem">
-                <div class="form-group" style="flex:0 0 80px"><label>修订S</label><input v-model.number="dfmeaForm.revised_S" type="number" min="1" max="10" placeholder="1-10"></div>
-                <div class="form-group" style="flex:0 0 80px"><label>修订O</label><input v-model.number="dfmeaForm.revised_O" type="number" min="1" max="10" placeholder="1-10"></div>
-                <div class="form-group" style="flex:0 0 80px"><label>修订D</label><input v-model.number="dfmeaForm.revised_D" type="number" min="1" max="10" placeholder="1-10"></div>
-                <div class="form-group" style="flex:1"><label>修订RPN</label><input v-model.number="dfmeaForm.revised_RPN" type="number" placeholder="手动输入修订后RPN"></div>
-            </div>
-            </details>
-
-            <!-- 关联参考资料 -->
-            <details style="margin-bottom:.5rem" open>
-                <summary style="font-size:.85rem;color:var(--primary);cursor:pointer;font-weight:600">
-                    关联参考资料 <span class="text-muted" style="font-weight:400">（[[ dfmeaSelectedRefIds.length ]] 项已选）</span>
-                </summary>
-                <!-- 已选标签 -->
-                <div style="margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.3rem" v-if="dfmeaSelectedRefIds.length > 0">
-                    <span v-for="rid in dfmeaSelectedRefIds" :key="rid" class="tag"
-                        style="font-size:.75rem;cursor:pointer;background:var(--primary);color:#fff;display:inline-flex;align-items:center;gap:.3rem"
-                        @click="dfmeaSelectedRefIds = dfmeaSelectedRefIds.filter(id => id !== rid)">
-                        [[ getRefTitle(rid) ]]
-                        <span style="opacity:.7;font-weight:700">×</span>
-                    </span>
-                </div>
-                <!-- 搜索框 -->
-                <input type="text" v-model="refSearchText" placeholder="输入关键词搜索参考资料..."
-                    style="width:100%;margin-top:.4rem;font-size:.82rem">
-                <!-- 搜索结果 -->
-                <div v-if="filteredRefs.length > 0"
-                    style="margin-top:.3rem;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)">
-                    <label v-for="ref in filteredRefs" :key="ref.id"
-                        style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem;font-size:.8rem;cursor:pointer;border-bottom:1px dotted var(--border)">
-                        <input type="checkbox" :value="ref.id" v-model="dfmeaSelectedRefIds" style="width:auto;flex-shrink:0">
-                        <span style="flex-shrink:0;font-size:.7rem;color:var(--text-secondary);min-width:48px">[[ ref.type ]]</span>
-                        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">[[ ref.title ]]</span>
-                        <span v-if="ref.node_name" style="font-size:.68rem;color:var(--text-secondary);flex-shrink:0">[[ ref.node_name ]]</span>
-                    </label>
-                </div>
-                <div v-else-if="refSearchText && projectReferences.length > 0" class="text-muted" style="font-size:.78rem;padding:.3rem .5rem">无匹配结果</div>
-                <div v-else-if="projectReferences.length === 0" class="text-muted" style="font-size:.78rem;padding:.3rem 0">暂无参考材料，请先在"参考材料"Tab 中上传或添加链接</div>
-            </details>
-
-            <div class="modal-actions">
+            <!-- Footer -->
+            <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;gap:.5rem;justify-content:flex-end">
                 <button class="btn btn-ghost" @click="showDfmeaModal=false">取消</button>
                 <button class="btn btn-primary" @click="saveDfmea">保存</button>
             </div>
@@ -755,6 +803,12 @@ createApp({
         const dfmeaSelectedRefIds = ref([]);
         const refSearchText = ref('');
         const sodOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        // chip input buffers
+        const newCause = ref('');
+        const newPrevention = ref('');
+        const newDetection = ref('');
+        const newDetectCat = ref('');
+        const newAction = ref('');
 
         const filteredRefs = computed(() => {
             const q = refSearchText.value.toLowerCase().trim();
@@ -1465,6 +1519,7 @@ createApp({
             openDfmeaAdd, editDfmea, saveDfmea, deleteDfmea, truncate,
             quickFillDfmea, onDfmeaItemChange, getDetectCat, setDetectCat,
             sodOptions, calcRPN, calcAP, rpnLevel,
+            newCause, newPrevention, newDetection, newDetectCat, newAction,
             // 参考材料
             references, showRefUpload, showRefUrl, selectedFile, refFilterNode, allNodesFlat, refForm,
             loadReferences, openRefUpload, openRefUrl, onFileSelected, uploadRef, saveRefUrl, deleteRef, openRef, isImage,
