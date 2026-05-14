@@ -33,10 +33,12 @@ def export_xlsx(project_id: int):
     """导出项目 DFMEA 数据为 Excel 文件"""
     try:
         data = export_svc.export_xlsx(project_id)
+        proj = get_db().execute("SELECT name FROM project WHERE id = ?", (project_id,)).fetchone()
+        filename = f"DFMEA_{proj['name']}.xlsx" if proj else f"DFMEA_project_{project_id}.xlsx"
         return StreamingResponse(
             io.BytesIO(data),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename=DFMEA_project_{project_id}.xlsx"},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
