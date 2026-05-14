@@ -1,0 +1,1479 @@
+{% extends "base.html" %}
+{% block body %}
+<div id="app" class="app-layout">
+    <header class="app-header">
+        <a href="/" class="btn btn-ghost btn-sm">← 返回</a>
+        <span class="text-muted" style="font-size:.8rem">[[ project.name ]]</span>
+        <button class="theme-toggle" onclick="cycleTheme()" title="切换主题" style="margin-left:.5rem">☀️ / 🌙</button>
+        <span class="sep"></span>
+        <nav class="tabs">
+            <span class="tab-item" :class="{ active: tab === 'structure' }" @click="tab = 'structure'">结构树</span>
+            <span class="tab-item" :class="{ active: tab === 'functions' }" @click="tab = 'functions'">功能分析</span>
+            <span class="tab-item" :class="{ active: tab === 'dfmea' }" @click="tab = 'dfmea'">DFMEA 工作表</span>
+            <span class="tab-item" :class="{ active: tab === 'references' }" @click="tab = 'references'">参考材料</span>
+            <span class="tab-item" :class="{ active: tab === 'export' }" @click="tab = 'export'">导出</span>
+        </nav>
+    </header>
+
+    <div class="project-layout" @click.self="hideCtxMenu" :class="{ 'is-resizing': isResizing }">
+        <!-- 左侧结构树 -->
+        <aside class="sidebar" v-if="tab !== 'export'" :style="{ width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px' }">
+            <div style="margin-bottom:.75rem;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:600;font-size:.85rem">结构树</span>
+                <button class="btn btn-ghost btn-sm" @click="addRootNode" title="添加顶层节点">+</button>
+            </div>
+            <div v-if="tree.length === 0" class="text-muted" style="font-size:.8rem;padding:.5rem">
+                暂无节点<br>拖拽节点可排序，右键查看更多操作
+            </div>
+            <tree-node-view v-for="node in tree" :key="node.id"
+                :node="node" :active-id="activeNodeId"
+                :dragging-id="dragNodeId" :drop-target="dropTarget"
+                @select="selectNode"
+                @refresh="loadStructure"
+                @ctxmenu="onCtxMenu"
+                @drag-begin="onDragBegin"
+                @drag-over="onDragOver"
+                @drag-leave="onDragLeave"
+                @dropped="onDropped"
+                @drag-end="onDragEnd" />
+        </aside>
+
+        <!-- 侧栏拖拽手柄 -->
+        <div class="resize-handle" v-if="tab !== 'export'" @mousedown="startResize"></div>
+
+        <!-- 主工作区 -->
+        <main class="main-content" @click="hideCtxMenu">
+            <div v-if="tab === 'structure'">
+                <h2 v-if="activeNode">[[ activeNode.name ]]</h2>
+                <div v-if="activeNode" class="node-edit-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>名称</label>
+                            <input v-model="activeNode.name" @change="debouncedSave">
+                        </div>
+                        <div class="form-group">
+                            <label>类型</label>
+                            <select v-model="activeNode.type" @change="debouncedSave">
+                                <option value="系统">系统</option>
+                                <option value="子系统">子系统</option>
+                                <option value="部件">部件</option>
+                                <option value="零件">零件</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>描述</label>
+                        <textarea v-model="activeNode.description" rows="4" @change="debouncedSave" placeholder="描述该节点的功能、接口、设计要点..."></textarea>
+                    </div>
+                </div>
+                <div v-else class="empty-state">
+                    <p>选择一个结构节点查看详情</p>
+                </div>
+            </div>
+
+            <!-- 功能分析 Tab -->
+            <div v-else-if="tab === 'functions'">
+                <div v-if="activeNode">
+                    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+                        <h2 style="flex:1">功能分析 — [[ activeNode.name ]]</h2>
+                        <button class="btn btn-ghost btn-sm" @click="openBatchFunc">批量导入</button>
+                        <button class="btn btn-primary btn-sm" @click="openAddFunc">+ 添加功能</button>
+                    </div>
+
+                    <table v-if="functions.length > 0" class="func-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px">#</th>
+                                <th style="width:200px">功能描述</th>
+                                <th>设计要求</th>
+                                <th>性能指标</th>
+                                <th>接口说明</th>
+                                <th style="width:80px">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(f, idx) in functions" :key="f.id">
+                                <td>[[ idx + 1 ]]</td>
+                                <td class="func-desc" @dblclick="editFunc(f)">[[ f.function_desc ]]</td>
+                                <td>[[ f.requirement || '-' ]]</td>
+                                <td>[[ f.performance_spec || '-' ]]</td>
+                                <td>[[ f.interface_desc || '-' ]]</td>
+                                <td>
+                                    <button class="btn btn-ghost btn-sm" @click="editFunc(f)" title="编辑">✎</button>
+                                    <button class="btn btn-ghost btn-sm" @click="deleteFunc(f)" title="删除" style="color:var(--danger)">✕</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-else class="empty-state" style="padding:3rem">
+                        <p>该节点暂无功能项</p>
+                        <p class="text-muted">点击"+ 添加功能"录入第一条</p>
+                    </div>
+                </div>
+                <div v-else class="empty-state">
+                    <p>请先在左侧结构树中选择一个节点</p>
+                </div>
+            </div>
+
+            <!-- DFMEA 工作表 Tab -->
+            <div v-else-if="tab === 'dfmea'">
+                <div v-if="activeNode">
+                    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+                        <h2 style="flex:1">DFMEA — [[ activeNode.name ]]</h2>
+                        <button class="btn btn-primary btn-sm" @click="openDfmeaAdd">+ 添加失效行</button>
+                    </div>
+
+                    <div class="dfmea-table-wrapper" v-if="failures.length > 0">
+                        <table class="dfmea-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th><th>功能</th><th>失效模式</th><th>失效影响</th>
+                                    <th style="width:55px">S</th><th style="width:50px">分类</th>
+                                    <th>失效原因</th><th style="width:55px">O</th>
+                                    <th>预防控制</th><th>探测控制</th><th style="width:55px">D</th>
+                                    <th style="width:65px">RPN</th><th style="width:50px">AP</th>
+                                    <th>建议措施</th><th style="width:65px">参考资料</th><th style="width:70px">状态</th>
+                                    <th style="width:65px">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(f, idx) in failures" :key="f.id"
+                                    :class="{ 'row-h': f.rpn >= 200, 'row-m': f.rpn >= 100 && f.rpn < 200 }">
+                                    <td>[[ idx + 1 ]]</td>
+                                    <td title="[[ f.function_desc ]]">[[ truncate(f.function_desc, 20) ]]</td>
+                                    <td title="[[ f.mode_desc ]]" @dblclick="editDfmea(f)">[[ truncate(f.mode_desc, 25) ]]</td>
+                                    <td title="[[ f.potential_effect ]]">[[ truncate(f.potential_effect, 25) ]]</td>
+                                    <td><span class="tag" :class="'tag-' + (f.severity_S >= 7 ? 'h' : f.severity_S >= 4 ? 'm' : 'l')">[[ f.severity_S ]]</span></td>
+                                    <td>[[ f.classification || '-' ]]</td>
+                                    <td title="[[ f.potential_cause ]]">[[ truncate(f.potential_cause, 20) ]]</td>
+                                    <td><span class="tag" :class="'tag-' + (f.occurrence_O >= 7 ? 'h' : f.occurrence_O >= 4 ? 'm' : 'l')">[[ f.occurrence_O ]]</span></td>
+                                    <td title="[[ f.prevention_control ]]">[[ truncate(f.prevention_control, 20) ]]</td>
+                                    <td title="[[ f.detection_control ]]">[[ truncate(f.detection_control, 20) ]]</td>
+                                    <td><span class="tag" :class="'tag-' + (f.detection_D >= 7 ? 'h' : f.detection_D >= 4 ? 'm' : 'l')">[[ f.detection_D ]]</span></td>
+                                    <td><span class="tag" :class="'tag-' + rpnLevel(f.rpn).toLowerCase()" style="font-weight:700">[[ f.rpn ]]</span></td>
+                                    <td><span class="tag" :class="'tag-' + f.action_priority.toLowerCase()">[[ f.action_priority ]]</span></td>
+                                    <td title="[[ f.recommended_action ]]">[[ truncate(f.recommended_action, 20) ]]</td>
+                                    <td>
+                                        <span v-if="f.linked_refs && f.linked_refs.length > 0"
+                                            class="tag" style="font-size:.7rem;cursor:pointer;background:var(--primary);color:#fff"
+                                            :title="f.linked_refs.map(r => r.title).join('\n')">
+                                            📎 [[ f.linked_refs.length ]]
+                                        </span>
+                                        <span v-else style="color:var(--text-secondary);font-size:.75rem">-</span>
+                                    </td>
+                                    <td>[[ f.action_status || '-' ]]</td>
+                                    <td>
+                                        <button class="btn btn-ghost btn-sm" @click="editDfmea(f)" title="编辑">✎</button>
+                                        <button class="btn btn-ghost btn-sm" @click="deleteDfmea(f)" title="删除" style="color:var(--danger)">✕</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else class="empty-state" style="padding:3rem">
+                        <p>该节点暂无失效分析数据</p>
+                        <p class="text-muted">点击"+ 添加失效行"开始 DFMEA 分析</p>
+                    </div>
+                </div>
+                <div v-else class="empty-state">
+                    <p>请先在左侧结构树中选择一个节点</p>
+                </div>
+            </div>
+
+            <!-- 参考材料 Tab -->
+            <div v-else-if="tab === 'references'">
+                <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+                    <h2 style="flex:1">参考材料</h2>
+                    <button class="btn btn-ghost btn-sm" @click="openRefUrl">+ 添加链接</button>
+                    <button class="btn btn-primary btn-sm" @click="openRefUpload">+ 上传文件</button>
+                </div>
+
+                <div v-if="references.length > 0" class="ref-grid">
+                    <div v-for="ref in references" :key="ref.id" class="ref-card">
+                        <div class="ref-preview" v-if="ref.file_path">
+                            <img v-if="isImage(ref.file_path)" :src="'/uploads/' + ref.file_path" class="ref-thumb" @click="openRef(ref)">
+                            <div v-else class="ref-file-icon" @click="openRef(ref)">📄</div>
+                        </div>
+                        <div class="ref-preview ref-link-icon" v-else-if="ref.url">🔗</div>
+                        <div class="ref-name">[[ ref.title ]]</div>
+                        <div class="ref-node text-muted" v-if="ref.node_name">关联: [[ ref.node_name ]]</div>
+                        <div class="ref-notes text-muted" v-if="ref.notes">[[ ref.notes ]]</div>
+                        <div class="ref-actions">
+                            <button class="btn btn-ghost btn-sm" @click="openRef(ref)">[[ ref.file_path ? '查看文件' : '打开链接' ]]</button>
+                            <button class="btn btn-ghost btn-sm" @click="deleteRef(ref)" style="color:var(--danger);margin-left:auto">✕</button>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="empty-state" style="padding:3rem">
+                    <p>暂无参考材料</p>
+                    <p class="text-muted">上传系统图、规格书等参考文件或添加外部链接</p>
+                </div>
+            </div>
+
+            <!-- 导入导出 Tab -->
+            <div v-else-if="tab === 'export'">
+                <h2 style="margin-bottom:1.5rem">导入导出</h2>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">
+                    <!-- 导出区 -->
+                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem">
+                        <h3 style="margin-bottom:.75rem">导出</h3>
+                        <p class="text-muted mb-2" style="font-size:.85rem">导出当前项目的 DFMEA 数据</p>
+                        <div style="display:flex;flex-direction:column;gap:.5rem">
+                            <a href="/api/v1/projects/{{ project_id }}/export/xlsx" class="btn btn-primary" style="justify-content:center">📥 导出 Excel（完整数据）</a>
+                            <a href="/api/v1/export/template" class="btn btn-ghost" style="justify-content:center">📋 下载空模板</a>
+                            <a href="/api/v1/projects/{{ project_id }}/export/json" class="btn btn-ghost" style="justify-content:center">💾 导出 JSON 备份</a>
+                        </div>
+                    </div>
+
+                    <!-- 导入区 -->
+                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem">
+                        <h3 style="margin-bottom:.75rem">导入</h3>
+                        <p class="text-muted mb-2" style="font-size:.85rem">从文件导入数据到当前项目</p>
+
+                        <div style="margin-bottom:1rem">
+                            <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:.35rem">从 Excel 导入失效行</label>
+                            <p class="text-muted" style="font-size:.75rem;margin-bottom:.3rem">下载模板 → 手动填写 → 上传导入</p>
+                            <input type="file" ref="xlsxInput" accept=".xlsx" @change="importXlsx" style="border:none;padding:.3rem 0">
+                            <div v-if="xlsxImporting" class="text-muted" style="font-size:.8rem">导入中...</div>
+                            <div v-if="xlsxResult" class="text-muted" style="font-size:.8rem">[[ xlsxResult ]]</div>
+                        </div>
+
+                        <div>
+                            <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:.35rem">从 JSON 恢复项目</label>
+                            <p class="text-muted" style="font-size:.75rem;margin-bottom:.3rem">导入之前导出的 JSON 备份，创建新项目</p>
+                            <input type="file" ref="jsonInput" accept=".json" @change="importJson" style="border:none;padding:.3rem 0">
+                            <div v-if="jsonImporting" class="text-muted" style="font-size:.8rem">导入中...</div>
+                            <div v-if="jsonResult" class="text-muted" style="font-size:.8rem">[[ jsonResult ]]</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 其他占位 Tab -->
+            <div v-else-if="tab !== 'structure'" class="empty-state">
+                <p>[[ tabLabel ]] — 将在后续阶段实现</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div v-if="ctxMenu.show" class="ctx-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+        <div class="ctx-item" @click="doAddChild">+ 添加子节点</div>
+        <div class="ctx-item" @click="doRename">✎ 重命名</div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" :class="{ disabled: !ctxMenu.canUp }" @click="doMoveUp">↑ 上移</div>
+        <div class="ctx-item" :class="{ disabled: !ctxMenu.canDown }" @click="doMoveDown">↓ 下移</div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item ctx-danger" @click="doDelete">✕ 删除</div>
+    </div>
+
+    <!-- 右键菜单遮罩（点击关闭） -->
+    <div v-if="ctxMenu.show" class="ctx-backdrop" @click="hideCtxMenu"></div>
+
+    <!-- 功能项编辑模态框 -->
+    <div v-if="showFuncModal" class="modal-overlay" @click.self="showFuncModal=false">
+        <div class="modal">
+            <h2>[[ editingFunc ? '编辑功能' : '添加功能' ]]</h2>
+            <div class="form-group">
+                <label>功能描述 <span style="color:var(--danger)">*</span></label>
+                <input v-model="funcForm.function_desc" placeholder="描述该功能的作用">
+            </div>
+            <div class="form-group">
+                <label>设计要求</label>
+                <input v-model="funcForm.requirement" placeholder="功能需要满足的设计要求">
+            </div>
+            <div class="form-group">
+                <label>性能指标</label>
+                <input v-model="funcForm.performance_spec" placeholder="量化的性能指标（如精度、响应时间等）">
+            </div>
+            <div class="form-group">
+                <label>接口说明</label>
+                <input v-model="funcForm.interface_desc" placeholder="输入/输出接口描述">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @click="showFuncModal=false">取消</button>
+                <button class="btn btn-primary" @click="saveFunc" :disabled="!funcForm.function_desc.trim()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量导入模态框 -->
+    <div v-if="showBatchModal" class="modal-overlay" @click.self="showBatchModal=false">
+        <div class="modal">
+            <h2>批量导入功能项</h2>
+            <p class="text-muted mb-1" style="font-size:.85rem">每行输入一个功能描述，将自动创建多条功能项</p>
+            <div class="form-group">
+                <textarea v-model="batchText" rows="10" placeholder="功能1描述&#10;功能2描述&#10;功能3描述&#10;..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @click="showBatchModal=false">取消</button>
+                <button class="btn btn-primary" @click="saveBatch" :disabled="!batchText.trim()">批量创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DFMEA 编辑模态框 -->
+    <!-- DFMEA 编辑模态框 -->
+    <div v-if="showDfmeaModal" class="modal-overlay" @click.self="showDfmeaModal=false">
+        <div class="modal" style="max-width:760px;min-width:600px">
+            <h2>[[ editingDfmea ? '编辑失效模式' : '添加失效模式' ]]</h2>
+
+            <!-- 快速填充 -->
+            <div class="form-group" v-if="!editingDfmea && allFailuresForFill.length > 0">
+                <label>从已有失效模式快速填充</label>
+                <select @change="quickFillDfmea($event.target.value)">
+                    <option value="">— 选择已有失效模式 —</option>
+                    <option v-for="f in allFailuresForFill" :key="f.id" :value="f.id">[[ f.mode_desc ]] ([[ truncate(f.function_desc,20) ]])</option>
+                </select>
+            </div>
+
+            <!-- 功能项 & 失效模式 -->
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label>关联功能项 <span style="color:var(--danger)">*</span></label>
+                    <select v-model="dfmeaForm.function_item_id" :disabled="!!editingDfmea">
+                        <option v-for="fn in functionsForDfmea" :key="fn.id" :value="fn.id">[[ fn.function_desc ]]</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1.5">
+                    <label>失效模式</label>
+                    <input v-model="dfmeaForm.mode_desc" placeholder="描述失效的表现形式">
+                </div>
+            </div>
+
+            <!-- 失效影响：对当前元素 + 对系统 -->
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label>失效影响 — 对当前元素</label>
+                    <input v-model="dfmeaForm.local_effect" placeholder="对当前部件/子系统的影响">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>失效影响 — 对系统/整机</label>
+                    <input v-model="dfmeaForm.potential_effect" placeholder="对上层系统或最终客户的影响">
+                </div>
+            </div>
+
+            <!-- S + 分类 + O -->
+            <div class="form-row" style="align-items:end">
+                <div class="form-group" style="flex:0 0 90px"><label>严重度 S</label><select v-model="dfmeaForm.severity_S"><option v-for="n in sodOptions" :key="n" :value="n">[[ n ]]</option></select></div>
+                <div class="form-group" style="flex:0 0 130px">
+                    <label>特殊特性
+                        <span class="field-hint" title="SC=重要特性(影响安全/法规/配合/功能/性能)&#10;CC=关键特性(影响安全/法规)">?</span>
+                    </label>
+                    <select v-model="dfmeaForm.classification"><option value="">—</option><option value="SC">SC 重要特性</option><option value="CC">CC 关键特性</option></select>
+                </div>
+                <div class="form-group" style="flex:0 0 90px"><label>频度 O</label><select v-model="dfmeaForm.occurrence_O"><option v-for="n in sodOptions" :key="n" :value="n">[[ n ]]</option></select></div>
+                <div class="form-group" style="flex:1"><label>探测度 D</label><select v-model="dfmeaForm.detection_D"><option v-for="n in sodOptions" :key="n" :value="n">[[ n ]]</option></select></div>
+            </div>
+
+            <!-- RPN / AP 实时计算 -->
+            <div class="rpn-preview">
+                <span>RPN = [[ dfmeaForm.severity_S ]] × [[ dfmeaForm.occurrence_O ]] × [[ dfmeaForm.detection_D ]] = </span>
+                <span :class="'tag tag-' + rpnLevel(calcRPN(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D)).toLowerCase()" style="font-size:.95rem;font-weight:700">[[ calcRPN(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D) ]]</span>
+                <span style="margin-left:1.5rem">AP = </span>
+                <span :class="'tag tag-' + calcAP(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D).toLowerCase()" style="font-size:.95rem;font-weight:700">[[ calcAP(dfmeaForm.severity_S,dfmeaForm.occurrence_O,dfmeaForm.detection_D) ]]</span>
+            </div>
+
+            <!-- 失效原因（多条目） -->
+            <div class="multi-field">
+                <label>失效原因 <span class="text-muted">（可添加多条）</span></label>
+                <div v-for="(item, i) in dfmeaItems.potential_cause" :key="'c'+i" class="item-row">
+                    <input v-model="dfmeaItems.potential_cause[i]" placeholder="失效原因..." @change="onDfmeaItemChange">
+                    <button class="btn btn-ghost btn-sm" @click="dfmeaItems.potential_cause.splice(i,1); onDfmeaItemChange()" title="删除">×</button>
+                </div>
+                <button class="add-item-btn" @click="dfmeaItems.potential_cause.push('')">+ 添加原因</button>
+            </div>
+
+            <!-- 预防控制（多条目） -->
+            <div class="multi-field">
+                <label>预防控制 <span class="text-muted">（防止失效原因发生的措施）</span></label>
+                <div v-for="(item, i) in dfmeaItems.prevention_control" :key="'p'+i" class="item-row">
+                    <input v-model="dfmeaItems.prevention_control[i]" placeholder="预防控制..." @change="onDfmeaItemChange">
+                    <button class="btn btn-ghost btn-sm" @click="dfmeaItems.prevention_control.splice(i,1); onDfmeaItemChange()" title="删除">×</button>
+                </div>
+                <button class="add-item-btn" @click="dfmeaItems.prevention_control.push('')">+ 添加预防控制</button>
+            </div>
+
+            <!-- 探测控制（多条目，分类+具体方法） -->
+            <div class="multi-field">
+                <label>探测控制 <span class="text-muted">（选择探测阶段 + 具体方法）</span></label>
+                <div v-for="(item, i) in dfmeaItems.detection_control" :key="'d'+i" class="item-row">
+                    <select :value="getDetectCat(dfmeaItems.detection_control[i])"
+                        @change="setDetectCat(dfmeaItems.detection_control, i, $event.target.value)"
+                        style="flex:0 0 120px;margin-right:.3rem">
+                        <option value="">— 阶段 —</option>
+                        <option>设计分析</option><option>验证测试</option><option>过程检测</option><option>下线检测</option>
+                    </select>
+                    <span class="text-muted" style="font-size:.75rem;margin-right:.2rem" v-if="getDetectCat(dfmeaItems.detection_control[i])">→</span>
+                    <input v-model="dfmeaItems.detection_control[i]" placeholder="具体探测方法..." @change="onDfmeaItemChange" style="flex:1">
+                    <button class="btn btn-ghost btn-sm" @click="dfmeaItems.detection_control.splice(i,1); onDfmeaItemChange()" title="删除">×</button>
+                </div>
+                <button class="add-item-btn" @click="dfmeaItems.detection_control.push('')">+ 添加探测控制</button>
+            </div>
+
+            <!-- 建议措施（多条目） -->
+            <div class="multi-field">
+                <label>建议措施 <span class="text-muted">（针对高风险项的改进措施）</span></label>
+                <div v-for="(item, i) in dfmeaItems.recommended_action" :key="'r'+i" class="item-row">
+                    <input v-model="dfmeaItems.recommended_action[i]" placeholder="改进措施..." @change="onDfmeaItemChange">
+                    <button class="btn btn-ghost btn-sm" @click="dfmeaItems.recommended_action.splice(i,1); onDfmeaItemChange()" title="删除">×</button>
+                </div>
+                <button class="add-item-btn" @click="dfmeaItems.recommended_action.push('')">+ 添加建议措施</button>
+            </div>
+
+            <!-- 措施管理 -->
+            <div class="form-row">
+                <div class="form-group" style="flex:1"><label>责任人</label><input v-model="dfmeaForm.action_owner" placeholder="负责人"></div>
+                <div class="form-group" style="flex:0 0 130px"><label>期限</label><input type="date" v-model="dfmeaForm.action_due_date"></div>
+                <div class="form-group" style="flex:0 0 120px"><label>状态</label><select v-model="dfmeaForm.action_status"><option>未开始</option><option>进行中</option><option>已完成</option><option>已取消</option></select></div>
+            </div>
+            <div class="form-group"><label>措施效果</label><input v-model="dfmeaForm.action_effect" placeholder="措施实施后的验证结果"></div>
+
+            <!-- 评分准则（内嵌参考） -->
+            <details style="margin-bottom:.5rem"><summary style="font-size:.85rem;color:var(--primary);cursor:pointer;font-weight:600" @click="loadCriteria()">S/O/D 评分准则 & AP 矩阵（点击展开）</summary>
+            <div style="display:flex;gap:1rem;margin-top:.5rem;flex-wrap:wrap" v-if="criteria.S.length">
+                <div v-for="t in ['S','O','D']" :key="t" style="flex:1;min-width:200px">
+                    <div style="font-size:.75rem;font-weight:700;margin-bottom:.2rem;color:var(--primary)">[[ t==='S'?'严重度 S':t==='O'?'频度 O':'探测度 D' ]]</div>
+                    <div v-for="c in criteria[t]" :key="c.score" style="font-size:.7rem;padding:1px 0;border-bottom:1px dotted var(--border);display:flex;gap:.3rem">
+                        <span style="font-weight:700;width:18px;flex-shrink:0">[[ c.score ]]</span>
+                        <span style="color:var(--text-secondary)">[[ c.title ]]</span>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top:.75rem;font-size:.75rem;color:var(--text-secondary)">
+                <div style="font-weight:700;color:var(--primary);margin-bottom:.2rem">AP 措施优先级判定</div>
+                <p>AP = H（高）：必须制定改进措施 | AP = M（中）：应制定改进措施 | AP = L（低）：可接受，无需强制措施</p>
+                <p>AP 依据 S、O、D 组合自动判定（AIAG-VDA 矩阵），优先降低 S，其次 O，最后 D</p>
+            </div>
+            </details>
+
+            <!-- 修订评分 -->
+            <details style="margin-bottom:.5rem"><summary style="font-size:.85rem;color:var(--text-secondary);cursor:pointer">修订评分（措施实施后）</summary>
+            <div class="form-row" style="color:var(--text-secondary);font-size:.85rem;margin-top:.5rem">
+                <div class="form-group" style="flex:0 0 80px"><label>修订S</label><input v-model.number="dfmeaForm.revised_S" type="number" min="1" max="10" placeholder="1-10"></div>
+                <div class="form-group" style="flex:0 0 80px"><label>修订O</label><input v-model.number="dfmeaForm.revised_O" type="number" min="1" max="10" placeholder="1-10"></div>
+                <div class="form-group" style="flex:0 0 80px"><label>修订D</label><input v-model.number="dfmeaForm.revised_D" type="number" min="1" max="10" placeholder="1-10"></div>
+                <div class="form-group" style="flex:1"><label>修订RPN</label><input v-model.number="dfmeaForm.revised_RPN" type="number" placeholder="手动输入修订后RPN"></div>
+            </div>
+            </details>
+
+            <!-- 关联参考资料 -->
+            <details style="margin-bottom:.5rem" open>
+                <summary style="font-size:.85rem;color:var(--primary);cursor:pointer;font-weight:600">
+                    关联参考资料 <span class="text-muted" style="font-weight:400">（[[ dfmeaSelectedRefIds.length ]] 项已选）</span>
+                </summary>
+                <!-- 已选标签 -->
+                <div style="margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.3rem" v-if="dfmeaSelectedRefIds.length > 0">
+                    <span v-for="rid in dfmeaSelectedRefIds" :key="rid" class="tag"
+                        style="font-size:.75rem;cursor:pointer;background:var(--primary);color:#fff;display:inline-flex;align-items:center;gap:.3rem"
+                        @click="dfmeaSelectedRefIds = dfmeaSelectedRefIds.filter(id => id !== rid)">
+                        [[ getRefTitle(rid) ]]
+                        <span style="opacity:.7;font-weight:700">×</span>
+                    </span>
+                </div>
+                <!-- 搜索框 -->
+                <input type="text" v-model="refSearchText" placeholder="输入关键词搜索参考资料..."
+                    style="width:100%;margin-top:.4rem;font-size:.82rem">
+                <!-- 搜索结果 -->
+                <div v-if="filteredRefs.length > 0"
+                    style="margin-top:.3rem;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)">
+                    <label v-for="ref in filteredRefs" :key="ref.id"
+                        style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem;font-size:.8rem;cursor:pointer;border-bottom:1px dotted var(--border)">
+                        <input type="checkbox" :value="ref.id" v-model="dfmeaSelectedRefIds" style="width:auto;flex-shrink:0">
+                        <span style="flex-shrink:0;font-size:.7rem;color:var(--text-secondary);min-width:48px">[[ ref.type ]]</span>
+                        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">[[ ref.title ]]</span>
+                        <span v-if="ref.node_name" style="font-size:.68rem;color:var(--text-secondary);flex-shrink:0">[[ ref.node_name ]]</span>
+                    </label>
+                </div>
+                <div v-else-if="refSearchText && projectReferences.length > 0" class="text-muted" style="font-size:.78rem;padding:.3rem .5rem">无匹配结果</div>
+                <div v-else-if="projectReferences.length === 0" class="text-muted" style="font-size:.78rem;padding:.3rem 0">暂无参考材料，请先在"参考材料"Tab 中上传或添加链接</div>
+            </details>
+
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @click="showDfmeaModal=false">取消</button>
+                <button class="btn btn-primary" @click="saveDfmea">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 评分准则参考弹窗 -->
+    <div v-if="showCriteria" class="modal-overlay" @click.self="showCriteria=false">
+        <div class="modal" style="max-width:800px;min-width:640px">
+            <h2>S / O / D 评分准则 (AIAG-VDA)</h2>
+            <div v-for="t in ['S', 'O', 'D']" :key="t" style="margin-bottom:1rem">
+                <h3 style="margin-bottom:.4rem;color:var(--primary)">[[ t === 'S' ? '严重度 S' : t === 'O' ? '频度 O' : '探测度 D' ]]</h3>
+                <table style="width:100%;font-size:.82rem;border-collapse:collapse">
+                    <thead><tr style="background:var(--bg)"><th style="padding:.3rem .5rem;text-align:left;width:50px">分值</th><th style="padding:.3rem .5rem;text-align:left;width:120px">等级</th><th style="padding:.3rem .5rem;text-align:left">描述</th></tr></thead>
+                    <tbody>
+                        <tr v-for="c in criteria[t]" :key="c.score" style="border-bottom:1px solid var(--border)">
+                            <td style="padding:.25rem .5rem;font-weight:600">[[ c.score ]]</td>
+                            <td style="padding:.25rem .5rem">[[ c.title ]]</td>
+                            <td style="padding:.25rem .5rem;color:var(--text-secondary)">[[ c.description ]]</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-actions"><button class="btn btn-primary" @click="showCriteria=false">关闭</button></div>
+        </div>
+    </div>
+
+    <!-- 参考材料 — 文件上传模态框 -->
+    <div v-if="showRefUpload" class="modal-overlay" @click.self="showRefUpload=false">
+        <div class="modal" style="max-width:460px">
+            <h2>上传参考文件</h2>
+            <div class="form-group"><label>标题 <span style="color:var(--danger)">*</span></label><input v-model="refForm.title" placeholder="材料名称"></div>
+            <div class="form-group">
+                <label>关联节点</label>
+                <select v-model="refForm.node_id"><option :value="null">— 不关联 —</option><option v-for="n in allNodesFlat" :key="n.id" :value="n.id">[[ n.name ]]</option></select>
+            </div>
+            <div class="form-group">
+                <label>文件 <span style="color:var(--danger)">*</span></label>
+                <input type="file" ref="fileInput" @change="onFileSelected" style="border:none;padding:.3rem 0">
+                <div v-if="selectedFile" class="text-muted" style="font-size:.8rem;margin-top:.2rem">[[ selectedFile.name ]] ([[ (selectedFile.size / 1024).toFixed(1) ]] KB)</div>
+            </div>
+            <div class="form-group"><label>备注</label><input v-model="refForm.notes" placeholder="补充说明"></div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @click="showRefUpload=false">取消</button>
+                <button class="btn btn-primary" @click="uploadRef" :disabled="!refForm.title.trim() || !selectedFile">上传</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 参考材料 — 外部链接模态框 -->
+    <div v-if="showRefUrl" class="modal-overlay" @click.self="showRefUrl=false">
+        <div class="modal" style="max-width:460px">
+            <h2>添加参考链接</h2>
+            <div class="form-group"><label>标题 <span style="color:var(--danger)">*</span></label><input v-model="refForm.title" placeholder="链接名称"></div>
+            <div class="form-group">
+                <label>关联节点</label>
+                <select v-model="refForm.node_id"><option :value="null">— 不关联 —</option><option v-for="n in allNodesFlat" :key="n.id" :value="n.id">[[ n.name ]]</option></select>
+            </div>
+            <div class="form-group"><label>URL <span style="color:var(--danger)">*</span></label><input v-model="refForm.url" placeholder="https://..."></div>
+            <div class="form-group"><label>备注</label><input v-model="refForm.notes" placeholder="补充说明"></div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @click="showRefUrl=false">取消</button>
+                <button class="btn btn-primary" @click="saveRefUrl" :disabled="!refForm.title.trim() || !refForm.url.trim()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const { createApp, ref, reactive, onMounted, computed, provide, watch } = Vue;
+
+const PROJECT_ID = {{ project_id }};
+
+// ── 递归树节点组件 ──
+const TreeNodeView = {
+    name: 'TreeNodeView',
+    delimiters: ['[[', ']]'],
+    props: {
+        node: Object,
+        activeId: Number,
+        draggingId: Number,
+        dropTarget: Object,
+    },
+    emits: ['select', 'refresh', 'ctxmenu', 'drag-begin', 'drag-over', 'drag-leave', 'dropped', 'drag-end'],
+    template: `
+        <div class="tree-node">
+            <div class="tree-row"
+                :class="{
+                    active: node.id === activeId,
+                    'drag-over': dropTarget && dropTarget.nodeId === node.id,
+                    'drag-over-before': dropTarget && dropTarget.nodeId === node.id && dropTarget.pos === 'before',
+                    'drag-over-after': dropTarget && dropTarget.nodeId === node.id && dropTarget.pos === 'after',
+                    'drag-over-inside': dropTarget && dropTarget.nodeId === node.id && dropTarget.pos === 'inside',
+                    'is-dragging': draggingId === node.id,
+                }"
+                :draggable="true"
+                @click="$emit('select', node)"
+                @contextmenu.stop.prevent="$emit('ctxmenu', { event: $event, node: node, siblings: siblings })"
+                @dragstart.stop="$emit('drag-begin', { event: $event, node: node })"
+                @dragover.stop.prevent="onDragOver($event)"
+                @dragleave.stop="onDragLeave($event)"
+                @drop.stop.prevent="$emit('dropped', { event: $event, targetNode: node, pos: dropPos })"
+                @dragend.stop="$emit('drag-end')"
+                @dblclick.stop="startRename">
+                <span class="tree-toggle" @click.stop="expanded = !expanded" v-if="node.children && node.children.length">
+                    [[ expanded ? '▼' : '▶' ]]
+                </span>
+                <span v-else style="width:18px"></span>
+                <span class="tree-icon">[[ icon ]]</span>
+                <span class="tree-name" v-if="!renaming">[[ node.name ]]</span>
+                <input v-else ref="renameInput" class="tree-rename-input"
+                    v-model="renameValue"
+                    @keyup.enter="finishRename"
+                    @keyup.escape="renaming = false; renameValue = node.name"
+                    @blur="finishRename"
+                    @click.stop />
+                <span class="tree-type">[[ node.type ]]</span>
+            </div>
+            <div v-if="expanded && node.children && node.children.length" class="tree-children">
+                <tree-node-view v-for="c in node.children" :key="c.id"
+                    :node="c" :active-id="activeId"
+                    :dragging-id="draggingId" :drop-target="dropTarget"
+                    @select="id => $emit('select', id)"
+                    @refresh="$emit('refresh')"
+                    @ctxmenu="d => $emit('ctxmenu', d)"
+                    @drag-begin="d => $emit('drag-begin', d)"
+                    @drag-over="d => $emit('drag-over', d)"
+                    @drag-leave="d => $emit('drag-leave', d)"
+                    @dropped="d => $emit('dropped', d)"
+                    @drag-end="$emit('drag-end')" />
+            </div>
+        </div>
+    `,
+    data() {
+        return {
+            expanded: true,
+            renaming: false,
+            renameValue: '',
+            dropPos: 'inside',
+        };
+    },
+    computed: {
+        icon() {
+            return { '系统': '⊞', '子系统': '⊟', '部件': '⚙', '零件': '▸' }[this.node.type] || '●';
+        },
+        siblings() {
+            return null; // populated by parent via event
+        },
+    },
+    methods: {
+        onDragOver(ev) {
+            const rect = ev.currentTarget.getBoundingClientRect();
+            const y = ev.clientY - rect.top;
+            const h = rect.height;
+            let pos;
+            if (y < h * 0.25) pos = 'before';
+            else if (y > h * 0.75) pos = 'after';
+            else pos = 'inside';
+            this.dropPos = pos;
+            this.$emit('drag-over', { event: ev, node: this.node, pos });
+        },
+        onDragLeave(ev) {
+            this.$emit('drag-leave', { event: ev, node: this.node });
+        },
+        startRename() {
+            this.renaming = true;
+            this.renameValue = this.node.name;
+            this.$nextTick(() => {
+                if (this.$refs.renameInput) this.$refs.renameInput.focus();
+            });
+        },
+        async finishRename() {
+            if (!this.renaming) return;
+            this.renaming = false;
+            const val = this.renameValue.trim();
+            if (val && val !== this.node.name) {
+                try {
+                    await API.put('/api/v1/structure/' + this.node.id, { name: val });
+                    this.$emit('refresh');
+                } catch (e) { showToast('重命名失败', 'warning'); }
+            }
+        },
+    },
+};
+
+// ── 根应用 ──
+createApp({
+    delimiters: ['[[', ']]'],
+    components: { TreeNodeView },
+    setup() {
+        const project = ref({});
+        const tree = ref([]);
+        const activeNode = ref(null);
+        const activeNodeId = ref(null);
+        const tab = ref('structure');
+
+        // 切换 Tab 时自动加载数据
+        watch(tab, (val) => {
+            if (val === 'functions' && activeNodeId.value) loadFunctions();
+            if (val === 'dfmea' && activeNodeId.value) { loadFailures(); loadFunctionsForDfmea(); }
+            if (val === 'references') { loadReferences(); loadAllNodesFlat(); }
+        });
+
+        // 侧栏缩放
+        const sidebarWidth = ref(Number(localStorage.getItem('dfmea-sidebar-width') || 260));
+        const isResizing = ref(false);
+
+        function startResize(e) {
+            isResizing.value = true;
+            const startX = e.clientX;
+            const startW = sidebarWidth.value;
+            function onMove(ev) {
+                const w = Math.max(180, Math.min(500, startW + ev.clientX - startX));
+                sidebarWidth.value = w;
+                localStorage.setItem('dfmea-sidebar-width', w);
+            }
+            function onUp() {
+                isResizing.value = false;
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+            e.preventDefault();
+        }
+
+        // 右键菜单状态
+        const ctxMenu = reactive({
+            show: false, x: 0, y: 0,
+            node: null, siblings: [],
+            canUp: false, canDown: false,
+        });
+
+        // 拖拽状态
+        const dragNodeId = ref(null);
+        const dropTarget = ref(null);
+
+        // 功能分析状态
+        const functions = ref([]);
+        const showFuncModal = ref(false);
+        const showBatchModal = ref(false);
+        const editingFunc = ref(null);
+        const funcForm = reactive({ function_desc: '', requirement: '', performance_spec: '', interface_desc: '' });
+        const batchText = ref('');
+
+        // DFMEA 状态
+        const failures = ref([]);
+        const showDfmeaModal = ref(false);
+        const editingDfmea = ref(null);
+        const dfmeaForm = reactive({
+            function_item_id: 0, mode_desc: '', potential_effect: '',
+            severity_S: 1, classification: '', potential_cause: '',
+            occurrence_O: 1, prevention_control: '', detection_control: '', detection_D: 1,
+            recommended_action: '', action_owner: '', action_due_date: '', action_status: '未开始',
+            action_effect: '', revised_S: null, revised_O: null, revised_D: null, revised_RPN: null,
+        });
+        const functionsForDfmea = ref([]);
+        const allFailuresForFill = ref([]);
+        const projectReferences = ref([]);
+        const dfmeaSelectedRefIds = ref([]);
+        const refSearchText = ref('');
+        const sodOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+        const filteredRefs = computed(() => {
+            const q = refSearchText.value.toLowerCase().trim();
+            if (!q) return [];
+            return projectReferences.value.filter(r =>
+                r.title.toLowerCase().includes(q) ||
+                (r.type || '').includes(q) ||
+                (r.node_name || '').toLowerCase().includes(q)
+            ).slice(0, 20);
+        });
+
+        function getRefTitle(refId) {
+            const r = projectReferences.value.find(r => r.id === refId);
+            return r ? r.title : '#' + refId;
+        }
+
+        // 参考材料状态
+        const references = ref([]);
+        const showRefUpload = ref(false);
+        const showRefUrl = ref(false);
+        const selectedFile = ref(null);
+        const refFilterNode = ref(null);
+        const allNodesFlat = ref([]);
+        const refForm = reactive({ title: '', type: '其他', node_id: null, url: '', notes: '' });
+
+        // 导入导出状态
+        const xlsxImporting = ref(false);
+        const xlsxResult = ref('');
+        const jsonImporting = ref(false);
+        const jsonResult = ref('');
+
+        // 评分准则
+        const showCriteria = ref(false);
+        const criteria = reactive({ S: [], O: [], D: [] });
+
+        async function loadCriteria() {
+            try { Object.assign(criteria, await API.get('/api/v1/criteria')); } catch (e) {}
+        }
+
+        // 多条目字段
+        const dfmeaItems = reactive({
+            potential_cause: [],
+            prevention_control: [],
+            detection_control: [],
+            recommended_action: [],
+        });
+
+        function resetDfmeaItems() {
+            dfmeaItems.potential_cause = [];
+            dfmeaItems.prevention_control = [];
+            dfmeaItems.detection_control = [];
+            dfmeaItems.recommended_action = [];
+        }
+
+        function onDfmeaItemChange() { /* 保持响应性 */ }
+
+        function getDetectCat(val) {
+            const m = (val || '').match(/^\[(.+?)\]\s?/);
+            return m ? m[1] : '';
+        }
+
+        function setDetectCat(arr, i, cat) {
+            if (!cat) return;
+            const old = arr[i] || '';
+            const method = old.replace(/^\[.*?\]\s?/, '');
+            arr[i] = '[' + cat + '] ' + method;
+        }
+
+        const tabLabel = computed(() => ({
+            structure: '结构树管理',
+            functions: '功能分析',
+            dfmea: 'DFMEA 工作表',
+            references: '参考材料',
+            export: '导入导出',
+        }[tab.value]));
+
+        // ── 数据加载 ──
+        async function loadProject() {
+            try {
+                project.value = await API.get('/api/v1/projects/' + PROJECT_ID);
+                document.title = project.value.name + ' — DFMEA';
+            } catch (e) { showToast('加载项目失败', 'warning'); }
+        }
+
+        async function loadStructure() {
+            try {
+                tree.value = await API.get('/api/v1/projects/' + PROJECT_ID + '/structure');
+            } catch (e) { /* ignore */ }
+        }
+
+        function selectNode(node) {
+            activeNodeId.value = node.id;
+            activeNode.value = findNode(tree.value, node.id) || node;
+            if (tab.value === 'functions') loadFunctions();
+            if (tab.value === 'dfmea') { loadFailures(); loadFunctionsForDfmea(); }
+        }
+
+        function findNode(nodes, id) {
+            for (const n of nodes) {
+                if (n.id === id) return n;
+                if (n.children) { const f = findNode(n.children, id); if (f) return f; }
+            }
+            return null;
+        }
+
+        function getSiblings(parentId) {
+            if (parentId === null || parentId === undefined) {
+                return tree.value;
+            }
+            const parent = findNode(tree.value, parentId);
+            return parent ? (parent.children || []) : [];
+        }
+
+        // ── 右键菜单 ──
+        function onCtxMenu({ event, node }) {
+            const parentId = node.parent_id ?? null;
+            const sibs = getSiblings(parentId);
+            const idx = sibs.findIndex(n => n.id === node.id);
+            ctxMenu.show = true;
+            ctxMenu.x = event.clientX;
+            ctxMenu.y = event.clientY;
+            ctxMenu.node = node;
+            ctxMenu.siblings = sibs;
+            ctxMenu.canUp = idx > 0;
+            ctxMenu.canDown = idx < sibs.length - 1;
+        }
+
+        function hideCtxMenu() {
+            ctxMenu.show = false;
+        }
+
+        async function doAddChild() {
+            hideCtxMenu();
+            const name = prompt('新节点名称:');
+            if (!name) return;
+            try {
+                await API.post('/api/v1/projects/' + PROJECT_ID + '/structure', {
+                    parent_id: ctxMenu.node.id, name, type: '部件'
+                });
+                loadStructure();
+            } catch (e) { showToast('添加失败', 'warning'); }
+        }
+
+        function doRename() {
+            hideCtxMenu();
+            selectNode(ctxMenu.node);
+            // trigger rename — find the component and start renaming
+            const val = prompt('新名称:', ctxMenu.node.name);
+            if (val && val.trim() && val !== ctxMenu.node.name) {
+                API.put('/api/v1/structure/' + ctxMenu.node.id, { name: val.trim() })
+                    .then(loadStructure)
+                    .catch(e => showToast('重命名失败', 'warning'));
+            }
+        }
+
+        async function doMoveUp() {
+            hideCtxMenu();
+            const node = ctxMenu.node;
+            const parentId = node.parent_id ?? null;
+            const sibs = getSiblings(parentId);
+            const idx = sibs.findIndex(n => n.id === node.id);
+            if (idx <= 0) return;
+            try {
+                await API.put('/api/v1/structure/' + node.id + '/move', {
+                    new_parent_id: parentId, new_index: idx - 1
+                });
+                loadStructure();
+            } catch (e) { showToast('移动失败', 'warning'); }
+        }
+
+        async function doMoveDown() {
+            hideCtxMenu();
+            const node = ctxMenu.node;
+            const parentId = node.parent_id ?? null;
+            const sibs = getSiblings(parentId);
+            const idx = sibs.findIndex(n => n.id === node.id);
+            if (idx >= sibs.length - 1) return;
+            try {
+                await API.put('/api/v1/structure/' + node.id + '/move', {
+                    new_parent_id: parentId, new_index: idx + 2
+                });
+                loadStructure();
+            } catch (e) { showToast('移动失败', 'warning'); }
+        }
+
+        async function doDelete() {
+            hideCtxMenu();
+            const node = ctxMenu.node;
+            if (!await confirmDlg('删除节点 "' + node.name + '" 及其所有子节点？')) return;
+            try {
+                await API.del('/api/v1/structure/' + node.id);
+                if (activeNodeId.value === node.id) {
+                    activeNode.value = null;
+                    activeNodeId.value = null;
+                }
+                loadStructure();
+                showToast('已删除 "' + node.name + '"', 'info');
+            } catch (e) { showToast('删除失败', 'warning'); }
+        }
+
+        // ── 拖拽排序 ──
+        function onDragBegin({ event, node }) {
+            dragNodeId.value = node.id;
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', String(node.id));
+        }
+
+        function onDragOver({ node, pos }) {
+            if (dragNodeId.value === node.id) return;
+            dropTarget.value = { nodeId: node.id, pos };
+        }
+
+        function onDragLeave() {
+            dropTarget.value = null;
+        }
+
+        async function onDropped({ targetNode, pos }) {
+            const srcId = dragNodeId.value;
+            dragNodeId.value = null;
+            dropTarget.value = null;
+            if (!srcId || srcId === targetNode.id) return;
+
+            // 判断目标位置
+            let newParentId, newIndex;
+            if (pos === 'inside') {
+                // 放入目标节点内部
+                newParentId = targetNode.id;
+                newIndex = 0;
+            } else {
+                // 放在目标节点之前或之后
+                newParentId = targetNode.parent_id ?? null;
+                const sibs = getSiblings(newParentId);
+                const targetIdx = sibs.findIndex(n => n.id === targetNode.id);
+                newIndex = (pos === 'before') ? targetIdx : targetIdx + 1;
+                // 如果源节点在同一父级且在目标之前，需要调整索引
+                const srcIdx = sibs.findIndex(n => n.id === srcId);
+                if (srcIdx >= 0 && srcIdx < targetIdx) {
+                    newIndex--;
+                }
+            }
+
+            try {
+                await API.put('/api/v1/structure/' + srcId + '/move', {
+                    new_parent_id: newParentId,
+                    new_index: Math.max(0, newIndex),
+                });
+                loadStructure();
+            } catch (e) { showToast('移动失败', 'warning'); }
+        }
+
+        function onDragEnd() {
+            dragNodeId.value = null;
+            dropTarget.value = null;
+        }
+
+        // ── 功能分析 ──
+        async function loadFunctions() {
+            if (!activeNodeId.value) return;
+            try {
+                functions.value = await API.get('/api/v1/nodes/' + activeNodeId.value + '/functions');
+            } catch (e) { functions.value = []; }
+        }
+
+        function resetFuncForm() {
+            funcForm.function_desc = '';
+            funcForm.requirement = '';
+            funcForm.performance_spec = '';
+            funcForm.interface_desc = '';
+        }
+
+        function openAddFunc() {
+            editingFunc.value = null;
+            resetFuncForm();
+            showFuncModal.value = true;
+        }
+
+        function editFunc(f) {
+            editingFunc.value = f;
+            funcForm.function_desc = f.function_desc;
+            funcForm.requirement = f.requirement || '';
+            funcForm.performance_spec = f.performance_spec || '';
+            funcForm.interface_desc = f.interface_desc || '';
+            showFuncModal.value = true;
+        }
+
+        async function saveFunc() {
+            if (!funcForm.function_desc.trim()) return;
+            const data = {
+                function_desc: funcForm.function_desc.trim(),
+                requirement: funcForm.requirement.trim(),
+                performance_spec: funcForm.performance_spec.trim(),
+                interface_desc: funcForm.interface_desc.trim(),
+            };
+            try {
+                if (editingFunc.value) {
+                    await API.put('/api/v1/functions/' + editingFunc.value.id, data);
+                } else {
+                    await API.post('/api/v1/nodes/' + activeNodeId.value + '/functions', data);
+                }
+                showFuncModal.value = false;
+                loadFunctions();
+                showToast(editingFunc.value ? '已更新' : '已添加', 'success');
+            } catch (e) { showToast('保存失败: ' + e.message, 'warning'); }
+        }
+
+        async function deleteFunc(f) {
+            if (!await confirmDlg('删除功能项 "' + f.function_desc.substring(0, 40) + '"？')) return;
+            const backup = { ...f };
+            try {
+                await API.del('/api/v1/functions/' + f.id);
+                loadFunctions();
+                showToast('已删除', 'info', async () => {
+                    await API.post('/api/v1/nodes/' + activeNodeId.value + '/functions', backup);
+                    loadFunctions();
+                    showToast('已撤销删除', 'success');
+                });
+            } catch (e) { showToast('删除失败', 'warning'); }
+        }
+
+        function openBatchFunc() {
+            batchText.value = '';
+            showBatchModal.value = true;
+        }
+
+        async function saveBatch() {
+            if (!batchText.value.trim()) return;
+            try {
+                const r = await API.post('/api/v1/nodes/' + activeNodeId.value + '/functions/batch', { text: batchText.value });
+                showBatchModal.value = false;
+                loadFunctions();
+                showToast('已批量创建 ' + r.count + ' 条', 'success');
+            } catch (e) { showToast('导入失败: ' + e.message, 'warning'); }
+        }
+
+        // ── DFMEA ──
+        async function loadFailures() {
+            if (!activeNodeId.value) return;
+            try {
+                failures.value = await API.get('/api/v1/nodes/' + activeNodeId.value + '/failures');
+            } catch (e) { failures.value = []; }
+            // 加载所有已有失效模式用于快速填充（跨项目通用）
+            loadAllFailuresForFill();
+        }
+
+        async function loadAllFailuresForFill() {
+            try {
+                // 获取当前项目所有结构节点
+                const tree = await API.get('/api/v1/projects/' + PROJECT_ID + '/structure');
+                const ids = [];
+                function collect(nodes) {
+                    for (const n of nodes) {
+                        ids.push(n.id);
+                        if (n.children) collect(n.children);
+                    }
+                }
+                collect(tree);
+                // 加载所有节点的失效模式
+                const all = [];
+                for (const nid of ids) {
+                    try {
+                        const fms = await API.get('/api/v1/nodes/' + nid + '/failures');
+                        all.push(...fms);
+                    } catch (e) { /* skip */ }
+                }
+                allFailuresForFill.value = all;
+            } catch (e) { /* silent */ }
+        }
+
+        function quickFillDfmea(fmId) {
+            if (!fmId) return;
+            const src = allFailuresForFill.value.find(f => f.id === parseInt(fmId));
+            if (!src) return;
+            dfmeaForm.mode_desc = src.mode_desc || '';
+            dfmeaForm.local_effect = src.local_effect || '';
+            dfmeaForm.potential_effect = src.potential_effect || '';
+            dfmeaForm.severity_S = src.severity_S || 1;
+            dfmeaForm.classification = src.classification || '';
+            dfmeaForm.occurrence_O = src.occurrence_O || 1;
+            dfmeaForm.detection_D = src.detection_D || 1;
+            // 多条目
+            dfmeaItems.potential_cause = (src.potential_cause || '').split('\n').filter(Boolean);
+            if (dfmeaItems.potential_cause.length === 0) dfmeaItems.potential_cause = [''];
+            dfmeaItems.prevention_control = (src.prevention_control || '').split('\n').filter(Boolean);
+            if (dfmeaItems.prevention_control.length === 0) dfmeaItems.prevention_control = [''];
+            dfmeaItems.detection_control = (src.detection_control || '').split('\n').filter(Boolean);
+            if (dfmeaItems.detection_control.length === 0) dfmeaItems.detection_control = [''];
+            dfmeaItems.recommended_action = (src.recommended_action || '').split('\n').filter(Boolean);
+            if (dfmeaItems.recommended_action.length === 0) dfmeaItems.recommended_action = [''];
+            dfmeaForm.recommended_action = '';
+            dfmeaForm.action_owner = src.action_owner || '';
+            dfmeaForm.action_status = src.action_status || '未开始';
+            dfmeaSelectedRefIds.value = (src.linked_refs || []).map(r => r.id);
+        }
+
+        async function loadFunctionsForDfmea() {
+            if (!activeNodeId.value) return;
+            try {
+                functionsForDfmea.value = await API.get('/api/v1/nodes/' + activeNodeId.value + '/functions');
+            } catch (e) { functionsForDfmea.value = []; }
+        }
+
+        async function loadProjectReferences() {
+            try {
+                projectReferences.value = await API.get('/api/v1/projects/' + PROJECT_ID + '/references');
+            } catch (e) { projectReferences.value = []; }
+        }
+
+        function resetDfmeaForm() {
+            dfmeaForm.function_item_id = functionsForDfmea.value.length > 0 ? functionsForDfmea.value[0].id : 0;
+            dfmeaForm.mode_desc = '';
+            dfmeaForm.local_effect = '';
+            dfmeaForm.potential_effect = '';
+            dfmeaForm.severity_S = 1;
+            dfmeaForm.classification = '';
+            dfmeaForm.potential_cause = '';
+            dfmeaForm.occurrence_O = 1;
+            dfmeaForm.prevention_control = '';
+            dfmeaForm.detection_control = '';
+            dfmeaForm.detection_D = 1;
+            dfmeaForm.recommended_action = '';
+            dfmeaForm.action_owner = '';
+            dfmeaForm.action_due_date = '';
+            dfmeaForm.action_status = '未开始';
+            dfmeaForm.action_effect = '';
+            dfmeaForm.revised_S = null;
+            dfmeaForm.revised_O = null;
+            dfmeaForm.revised_D = null;
+            dfmeaForm.revised_RPN = null;
+            dfmeaSelectedRefIds.value = [];
+            refSearchText.value = '';
+            resetDfmeaItems();
+            dfmeaItems.potential_cause = [''];
+            dfmeaItems.prevention_control = [''];
+            dfmeaItems.detection_control = [''];
+            dfmeaItems.recommended_action = [''];
+        }
+
+        async function openDfmeaAdd() {
+            if (functionsForDfmea.value.length === 0) {
+                showToast('请先在功能分析中添加至少一个功能项', 'warning');
+                return;
+            }
+            editingDfmea.value = null;
+            resetDfmeaForm();
+            loadProjectReferences();
+            showDfmeaModal.value = true;
+        }
+
+        function editDfmea(f) {
+            editingDfmea.value = f;
+            dfmeaForm.function_item_id = f.function_item_id;
+            dfmeaSelectedRefIds.value = (f.linked_refs || []).map(r => r.id);
+            refSearchText.value = '';
+            loadProjectReferences();
+            dfmeaForm.mode_desc = f.mode_desc || '';
+            dfmeaForm.local_effect = f.local_effect || '';
+            dfmeaForm.potential_effect = f.potential_effect || '';
+            dfmeaForm.severity_S = f.severity_S || 1;
+            dfmeaForm.classification = f.classification || '';
+            dfmeaForm.potential_cause = '';
+            dfmeaForm.occurrence_O = f.occurrence_O || 1;
+            dfmeaForm.prevention_control = '';
+            dfmeaForm.detection_control = '';
+            dfmeaForm.detection_D = f.detection_D || 1;
+            dfmeaForm.recommended_action = '';
+            dfmeaForm.action_owner = f.action_owner || '';
+            dfmeaForm.action_due_date = f.action_due_date || '';
+            dfmeaForm.action_status = f.action_status || '未开始';
+            dfmeaForm.action_effect = f.action_effect || '';
+            dfmeaForm.revised_S = f.revised_S;
+            dfmeaForm.revised_O = f.revised_O;
+            dfmeaForm.revised_D = f.revised_D;
+            dfmeaForm.revised_RPN = f.revised_RPN;
+            // 多条目
+            function splitTo(val) { const arr = (val || '').split('\n').filter(Boolean); return arr.length > 0 ? arr : ['']; }
+            dfmeaItems.potential_cause = splitTo(f.potential_cause);
+            dfmeaItems.prevention_control = splitTo(f.prevention_control);
+            dfmeaItems.detection_control = splitTo(f.detection_control);
+            dfmeaItems.recommended_action = splitTo(f.recommended_action);
+            showDfmeaModal.value = true;
+        }
+
+        async function saveDfmea() {
+            const data = { ...dfmeaForm };
+            data.reference_ids = [...dfmeaSelectedRefIds.value];
+            // 将多条目数组 join 为换行分隔文本
+            data.potential_cause = dfmeaItems.potential_cause.filter(s => s.trim()).join('\n');
+            data.prevention_control = dfmeaItems.prevention_control.filter(s => s.trim()).join('\n');
+            data.detection_control = dfmeaItems.detection_control.filter(s => s.trim()).join('\n');
+            data.recommended_action = dfmeaItems.recommended_action.filter(s => s.trim()).join('\n');
+            try {
+                if (editingDfmea.value) {
+                    await API.put('/api/v1/failures/' + editingDfmea.value.id, data);
+                } else {
+                    await API.post('/api/v1/nodes/' + activeNodeId.value + '/failures', data);
+                }
+                showDfmeaModal.value = false;
+                loadFailures();
+                showToast(editingDfmea.value ? '已更新' : '已添加', 'success');
+            } catch (e) { showToast('保存失败: ' + e.message, 'warning'); }
+        }
+
+        async function deleteDfmea(f) {
+            if (!await confirmDlg('删除失效模式 "' + (f.mode_desc || '(无)').substring(0, 40) + '"？')) return;
+            const backup = { ...f };
+            try {
+                await API.del('/api/v1/failures/' + f.id);
+                loadFailures();
+                showToast('已删除', 'info', async () => {
+                    await API.post('/api/v1/nodes/' + activeNodeId.value + '/failures', backup);
+                    loadFailures();
+                    showToast('已撤销删除', 'success');
+                });
+            } catch (e) { showToast('删除失败', 'warning'); }
+        }
+
+        function truncate(str, n) {
+            if (!str) return '-';
+            return str.length > n ? str.substring(0, n) + '...' : str;
+        }
+
+        // ── 参考材料 ──
+        async function loadReferences() {
+            try {
+                const params = refFilterNode.value ? '?node_id=' + refFilterNode.value : '';
+                references.value = await API.get('/api/v1/projects/' + PROJECT_ID + '/references' + params);
+            } catch (e) { references.value = []; }
+        }
+
+        async function loadAllNodesFlat() {
+            try {
+                const tree = await API.get('/api/v1/projects/' + PROJECT_ID + '/structure');
+                const flat = [];
+                function collect(nodes) {
+                    for (const n of nodes) {
+                        flat.push({ id: n.id, name: n.name });
+                        if (n.children) collect(n.children);
+                    }
+                }
+                collect(tree);
+                allNodesFlat.value = flat;
+            } catch (e) { allNodesFlat.value = []; }
+        }
+
+        function resetRefForm() {
+            refForm.title = '';
+            refForm.type = '其他';
+            refForm.node_id = null;
+            refForm.url = '';
+            refForm.notes = '';
+            selectedFile.value = null;
+        }
+
+        function openRefUpload() {
+            resetRefForm();
+            showRefUpload.value = true;
+        }
+
+        function openRefUrl() {
+            resetRefForm();
+            showRefUrl.value = true;
+        }
+
+        function onFileSelected(e) {
+            selectedFile.value = e.target.files[0] || null;
+        }
+
+        async function uploadRef() {
+            if (!selectedFile.value) return;
+            const fd = new FormData();
+            fd.append('file', selectedFile.value);
+            fd.append('title', refForm.title.trim());
+            fd.append('type', refForm.type);
+            if (refForm.node_id) fd.append('node_id', String(refForm.node_id));
+            fd.append('notes', refForm.notes);
+
+            try {
+                const res = await fetch('/api/v1/projects/' + PROJECT_ID + '/references/upload', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error(await res.text());
+                showRefUpload.value = false;
+                loadReferences();
+                showToast('已上传', 'success');
+            } catch (e) { showToast('上传失败: ' + e.message, 'warning'); }
+        }
+
+        async function saveRefUrl() {
+            try {
+                await API.post('/api/v1/projects/' + PROJECT_ID + '/references', {
+                    title: refForm.title.trim(),
+                    type: refForm.type,
+                    node_id: refForm.node_id,
+                    url: refForm.url.trim(),
+                    notes: refForm.notes,
+                });
+                showRefUrl.value = false;
+                loadReferences();
+                showToast('已添加', 'success');
+            } catch (e) { showToast('保存失败: ' + e.message, 'warning'); }
+        }
+
+        async function deleteRef(r) {
+            if (!await confirmDlg('删除参考材料 "' + r.title + '"？')) return;
+            const backup = { title: r.title, type: r.type, url: r.url, notes: r.notes, node_id: r.node_id };
+            try {
+                await API.del('/api/v1/references/' + r.id);
+                loadReferences();
+                showToast('已删除', 'info', async () => {
+                    await API.post('/api/v1/projects/' + PROJECT_ID + '/references', backup);
+                    loadReferences();
+                    showToast('已撤销删除', 'success');
+                });
+            } catch (e) { showToast('删除失败', 'warning'); }
+        }
+
+        function openRef(ref) {
+            if (ref.file_path) {
+                window.open('/uploads/' + ref.file_path, '_blank');
+            } else if (ref.url) {
+                window.open(ref.url, '_blank');
+            }
+        }
+
+        function isImage(path) {
+            return /\.(png|jpg|jpeg|gif|svg|webp|bmp)$/i.test(path || '');
+        }
+
+        async function importXlsx(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            xlsxImporting.value = true;
+            xlsxResult.value = '';
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await fetch('/api/v1/projects/' + PROJECT_ID + '/import/xlsx', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                xlsxResult.value = '成功导入 ' + data.imported + ' 条失效行';
+                loadFailures();
+                showToast('已导入 ' + data.imported + ' 条', 'success');
+            } catch (e) { xlsxResult.value = '导入失败: ' + e.message; showToast('导入失败', 'warning'); }
+            finally { xlsxImporting.value = false; e.target.value = ''; }
+        }
+
+        async function importJson(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            jsonImporting.value = true;
+            jsonResult.value = '';
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await fetch('/api/v1/projects/import/json', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                jsonResult.value = '项目已恢复，新项目 ID: ' + data.project_id;
+                showToast('项目已恢复', 'success');
+            } catch (e) { jsonResult.value = '导入失败: ' + e.message; showToast('导入失败', 'warning'); }
+            finally { jsonImporting.value = false; e.target.value = ''; }
+        }
+
+        // ── 其他 ──
+        function addRootNode() {
+            const name = prompt('顶层节点名称:');
+            if (!name) return;
+            API.post('/api/v1/projects/' + PROJECT_ID + '/structure', { name, type: '系统' })
+                .then(loadStructure)
+                .catch(e => showToast('添加失败', 'warning'));
+        }
+
+        const debouncedSave = debounce(async () => {
+            if (!activeNode.value) return;
+            try {
+                await API.put('/api/v1/structure/' + activeNode.value.id, {
+                    name: activeNode.value.name,
+                    type: activeNode.value.type,
+                    part_number: activeNode.value.part_number,
+                    description: activeNode.value.description,
+                });
+            } catch (e) { /* silent */ }
+        }, 800);
+
+        // ── 键盘快捷键 ──
+        function onKeydown(e) {
+            if (e.key === 'Escape') hideCtxMenu();
+        }
+
+        onMounted(() => {
+            loadProject();
+            loadStructure();
+            document.addEventListener('keydown', onKeydown);
+        });
+
+        return {
+            project, tree, activeNode, activeNodeId, tab, tabLabel,
+            ctxMenu, dragNodeId, dropTarget,
+            sidebarWidth, isResizing, startResize,
+            selectNode, loadStructure, addRootNode, debouncedSave,
+            onCtxMenu, hideCtxMenu,
+            doAddChild, doRename, doMoveUp, doMoveDown, doDelete,
+            onDragBegin, onDragOver, onDragLeave, onDropped, onDragEnd,
+            // 功能分析
+            functions, showFuncModal, showBatchModal, editingFunc, funcForm, batchText,
+            openAddFunc, editFunc, saveFunc, deleteFunc, openBatchFunc, saveBatch,
+            // DFMEA
+            failures, showDfmeaModal, editingDfmea, dfmeaForm, dfmeaItems,
+            functionsForDfmea, allFailuresForFill, projectReferences, dfmeaSelectedRefIds, refSearchText, filteredRefs, getRefTitle,
+            openDfmeaAdd, editDfmea, saveDfmea, deleteDfmea, truncate,
+            quickFillDfmea, onDfmeaItemChange, getDetectCat, setDetectCat,
+            sodOptions, calcRPN, calcAP, rpnLevel,
+            // 参考材料
+            references, showRefUpload, showRefUrl, selectedFile, refFilterNode, allNodesFlat, refForm,
+            loadReferences, openRefUpload, openRefUrl, onFileSelected, uploadRef, saveRefUrl, deleteRef, openRef, isImage,
+            // 导入导出
+            xlsxImporting, xlsxResult, jsonImporting, jsonResult, importXlsx, importJson,
+            // 评分准则
+            showCriteria, criteria, loadCriteria,
+        };
+    }
+}).mount('#app');
+</script>
+{% endblock %}

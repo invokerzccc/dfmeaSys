@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block body %}
+<div id="app" class="app-layout">
+    <header class="app-header">
+        <span class="logo">DFMEA</span>
+        <span class="text-muted" style="font-size:.8rem">个人记录系统</span>
+        <span class="sep"></span>
+        <button class="theme-toggle" onclick="cycleTheme()" title="切换主题">☀️ / 🌙</button>
+        <a href="/docs" target="_blank" class="btn btn-ghost btn-sm">API 文档</a>
+    </header>
+
+    <main class="app-main">
+        <div class="dashboard-header">
+            <h1>项目列表</h1>
+            <button class="btn btn-primary" @click="showCreateModal">+ 新建项目</button>
+        </div>
+
+        <div class="mb-2">
+            <input type="text" v-model="search" placeholder="搜索项目..." style="width:280px">
+        </div>
+
+        <div v-if="loading" style="text-align:center;padding:3rem">
+            <div class="spinner" style="margin:0 auto"></div>
+            <p class="text-muted mt-1">加载中...</p>
+        </div>
+
+        <div v-else-if="filteredProjects.length === 0" class="empty-state">
+            <div class="empty-icon">&#x1F4CB;</div>
+            <p v-if="projects.length === 0">还没有 DFMEA 项目</p>
+            <p v-else>没有匹配的项目</p>
+            <button class="btn btn-primary mt-2" @click="showCreateModal">创建第一个项目</button>
+        </div>
+
+        <div v-else class="project-grid">
+            <div v-for="p in filteredProjects" :key="p.id" class="project-card">
+                <div class="card-name">[[ p.name ]]</div>
+                <div class="card-desc">[[ p.description || '暂无描述' ]]</div>
+                <div class="card-stats">
+                    <span>部件: <span class="stat-value">[[ p.node_count ]]</span></span>
+                    <span>功能项: <span class="stat-value">[[ p.function_count ]]</span></span>
+                    <span>高风险: <span :class="p.high_risk_count > 0 ? 'stat-high' : 'stat-value'">[[ p.high_risk_count ]]</span></span>
+                </div>
+                <div class="card-actions">
+                    <span class="card-date">[[ formatDate(p.updated_at) ]]</span>
+                    <a :href="`/project/${p.id}`" class="btn btn-primary btn-sm">打开</a>
+                    <button class="btn btn-ghost btn-sm" @click="removeProject(p)">删除</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div v-if="showModal" class="modal-overlay" @click.self="showModal=false">
+        <div class="modal">
+            <h2>新建项目</h2>
+            <div class="form-group">
+                <label>项目名称 <span style="color:var(--danger)">*</span></label>
+                <input type="text" v-model="form.name" placeholder="例：液冷机组电控系统" @keyup.enter="createProject">
+            </div>
+            <div class="form-group">
+                <label>项目描述</label>
+                <textarea v-model="form.description" rows="3" placeholder="可选：简要描述分析范围和目标"></textarea>
+            </div>
+            <div class="form-group" v-if="projects.length > 0">
+                <label>从已有项目复制结构（可选）</label>
+                <select v-model="form.template_id">
+                    <option :value="null">— 空白项目 —</option>
+                    <option v-for="p in projects" :key="p.id" :value="p.id">[[ p.name ]]</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @click="showModal=false">取消</button>
+                <button class="btn btn-primary" @click="createProject" :disabled="!form.name.trim()">创建</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const { createApp, ref, computed, onMounted } = Vue;
+
+createApp({
+    delimiters: ['[[', ']]'],
+    setup() {
+        const projects = ref([]);
+        const loading = ref(true);
+        const search = ref('');
+        const showModal = ref(false);
+        const form = ref({ name: '', description: '', template_id: null });
+
+        const filteredProjects = computed(() => {
+            const q = search.value.toLowerCase();
+            return projects.value.filter(p => p.name.toLowerCase().includes(q));
+        });
+
+        async function loadProjects() {
+            loading.value = true;
+            try {
+                projects.value = await API.get('/api/v1/projects');
+            } catch (e) {
+                showToast('加载失败: ' + e.message, 'warning');
+            } finally {
+                loading.value = false;
+            }
+        }
+
+        function showCreateModal() {
+            form.value = { name: '', description: '', template_id: null };
+            showModal.value = true;
+        }
+
+        async function createProject() {
+            if (!form.value.name.trim()) return;
+            try {
+                await API.post('/api/v1/projects', form.value);
+                showModal.value = false;
+                showToast('项目已创建', 'success');
+                loadProjects();
+            } catch (e) {
+                showToast('创建失败: ' + e.message, 'warning');
+            }
+        }
+
+        async function removeProject(p) {
+            if (!await confirmDlg('确认删除项目 "' + p.name + '"？\n删除后可在数据库中恢复。')) return;
+            try {
+                await API.del('/api/v1/projects/' + p.id);
+                showToast('已删除 "' + p.name + '"', 'info');
+                loadProjects();
+            } catch (e) {
+                showToast('删除失败: ' + e.message, 'warning');
+            }
+        }
+
+        onMounted(loadProjects);
+
+        return {
+            projects, loading, search, showModal, form,
+            filteredProjects, showCreateModal, createProject, removeProject,
+            formatDate,
+        };
+    }
+}).mount('#app');
+</script>
+{% endblock %}
