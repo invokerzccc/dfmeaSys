@@ -116,9 +116,9 @@
             </div>
 
             <!-- DFMEA 工作表 Tab -->
-            <div v-else-if="tab === 'dfmea'">
-                <div v-if="activeNode">
-                    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+            <div v-else-if="tab === 'dfmea'" class="dfmea-tab-content">
+                <div v-if="activeNode" style="display:flex;flex-direction:column;flex:1;min-height:0">
+                    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
                         <h2 style="flex:1">DFMEA — [[ activeNode.name ]]</h2>
                         <button class="btn btn-primary btn-sm" @click="openDfmeaAdd">+ 添加失效行</button>
                     </div>
@@ -127,33 +127,33 @@
                         <table class="dfmea-table">
                             <thead>
                                 <tr>
-                                    <th>#</th><th>功能</th><th>失效模式</th><th>失效影响</th>
-                                    <th style="width:55px">S</th><th style="width:50px">分类</th>
-                                    <th>失效原因</th><th style="width:55px">O</th>
-                                    <th>预防控制</th><th>探测控制</th><th style="width:55px">D</th>
-                                    <th style="width:65px">RPN</th><th style="width:50px">AP</th>
-                                    <th>建议措施</th><th style="width:65px">参考资料</th><th style="width:70px">状态</th>
-                                    <th style="width:65px">操作</th>
+                                    <th style="width:32px">#</th><th style="min-width:90px">功能</th><th style="min-width:100px">失效模式</th><th style="min-width:160px">失效影响</th>
+                                    <th style="width:48px">S</th><th style="width:48px">分类</th>
+                                    <th style="min-width:160px">失效原因</th><th style="width:48px">O</th>
+                                    <th style="min-width:160px">预防控制</th><th style="min-width:160px">探测控制</th><th style="width:48px">D</th>
+                                    <th style="width:60px">RPN</th><th style="width:44px">AP</th>
+                                    <th style="min-width:140px">建议措施</th><th style="width:55px">参考</th><th style="width:60px">状态</th>
+                                    <th style="width:55px">操作</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="(f, idx) in failures" :key="f.id"
                                     :class="{ 'row-h': f.rpn >= 200, 'row-m': f.rpn >= 100 && f.rpn < 200 }">
-                                    <td>[[ idx + 1 ]]</td>
-                                    <td title="[[ f.function_desc ]]">[[ truncate(f.function_desc, 20) ]]</td>
-                                    <td title="[[ f.mode_desc ]]" @dblclick="editDfmea(f)">[[ truncate(f.mode_desc, 25) ]]</td>
-                                    <td title="[[ f.potential_effect ]]">[[ truncate(f.potential_effect, 25) ]]</td>
-                                    <td style="text-align:center"><span class="score-dot" :class="'score-' + (f.severity_S >= 7 ? 'h' : f.severity_S >= 4 ? 'm' : 'l')">[[ f.severity_S ]]</span></td>
-                                    <td>[[ f.classification || '-' ]]</td>
-                                    <td title="[[ f.potential_cause ]]">[[ truncate(f.potential_cause, 20) ]]</td>
-                                    <td style="text-align:center"><span class="score-dot" :class="'score-' + (f.occurrence_O >= 7 ? 'h' : f.occurrence_O >= 4 ? 'm' : 'l')">[[ f.occurrence_O ]]</span></td>
-                                    <td title="[[ f.prevention_control ]]">[[ truncate(f.prevention_control, 20) ]]</td>
-                                    <td title="[[ f.detection_control ]]">[[ truncate(f.detection_control, 20) ]]</td>
-                                    <td style="text-align:center"><span class="score-dot" :class="'score-' + (f.detection_D >= 7 ? 'h' : f.detection_D >= 4 ? 'm' : 'l')">[[ f.detection_D ]]</span></td>
-                                    <td><span class="tag" :class="'tag-' + rpnLevel(f.rpn).toLowerCase()" style="font-weight:700">[[ f.rpn ]]</span></td>
-                                    <td><span class="tag" :class="'tag-' + f.action_priority.toLowerCase()">[[ f.action_priority ]]</span></td>
-                                    <td title="[[ f.recommended_action ]]">[[ truncate(f.recommended_action, 20) ]]</td>
-                                    <td>
+                                    <td class="nowrap">[[ idx + 1 ]]</td>
+                                    <td class="nowrap" :title="f.function_desc">[[ truncate(f.function_desc, 18) ]]</td>
+                                    <td :title="f.mode_desc" @dblclick="editDfmea(f)">[[ truncate(f.mode_desc, 22) ]]</td>
+                                    <td :title="f.potential_effect"><div v-for="(line, i) in f.potential_effect.split('\n')" :key="'e'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
+                                    <td class="nowrap" style="text-align:center"><span class="score-dot" :class="'score-' + (f.severity_S >= 7 ? 'h' : f.severity_S >= 4 ? 'm' : 'l')">[[ f.severity_S ]]</span></td>
+                                    <td class="nowrap">[[ f.classification || '-' ]]</td>
+                                    <td :title="f.potential_cause"><div v-for="(line, i) in f.potential_cause.split('\n')" :key="'c'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
+                                    <td class="nowrap" style="text-align:center"><span class="score-dot" :class="'score-' + (f.occurrence_O >= 7 ? 'h' : f.occurrence_O >= 4 ? 'm' : 'l')">[[ f.occurrence_O ]]</span></td>
+                                    <td :title="f.prevention_control"><div v-for="(line, i) in f.prevention_control.split('\n')" :key="'p'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
+                                    <td :title="f.detection_control"><div v-for="(line, i) in f.detection_control.split('\n')" :key="'d'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
+                                    <td class="nowrap" style="text-align:center"><span class="score-dot" :class="'score-' + (f.detection_D >= 7 ? 'h' : f.detection_D >= 4 ? 'm' : 'l')">[[ f.detection_D ]]</span></td>
+                                    <td class="nowrap"><span class="tag" :class="'tag-' + rpnLevel(f.rpn).toLowerCase()" style="font-weight:700">[[ f.rpn ]]</span></td>
+                                    <td class="nowrap"><span class="tag" :class="'tag-' + f.action_priority.toLowerCase()">[[ f.action_priority ]]</span></td>
+                                    <td :title="f.recommended_action"><div v-for="(line, i) in f.recommended_action.split('\n')" :key="'r'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
+                                    <td class="nowrap" style="text-align:center">
                                         <span v-if="f.linked_refs && f.linked_refs.length > 0"
                                             class="tag" style="font-size:.7rem;cursor:pointer;background:var(--primary);color:#fff"
                                             :title="f.linked_refs.map(r => r.title).join('\n')">
@@ -161,8 +161,8 @@
                                         </span>
                                         <span v-else style="color:var(--text-secondary);font-size:.75rem">-</span>
                                     </td>
-                                    <td>[[ f.action_status || '-' ]]</td>
-                                    <td>
+                                    <td class="nowrap">[[ f.action_status || '-' ]]</td>
+                                    <td class="nowrap">
                                         <button class="btn btn-ghost btn-sm" @click="editDfmea(f)" title="编辑">✎</button>
                                         <button class="btn btn-ghost btn-sm" @click="deleteDfmea(f)" title="删除" style="color:var(--danger)">✕</button>
                                     </td>
@@ -272,24 +272,24 @@
     <div v-if="ctxMenu.show" class="ctx-backdrop" @click="hideCtxMenu"></div>
 
     <!-- 功能项编辑模态框 -->
-    <div v-if="showFuncModal" class="modal-overlay" @click.self="showFuncModal=false">
-        <div class="modal">
+    <div v-if="showFuncModal" class="modal-overlay">
+        <div class="modal" style="max-width:760px;min-width:560px">
             <h2>[[ editingFunc ? '编辑功能' : '添加功能' ]]</h2>
             <div class="form-group">
                 <label>功能描述 <span style="color:var(--danger)">*</span></label>
-                <input v-model="funcForm.function_desc" placeholder="描述该功能的作用">
+                <textarea v-model="funcForm.function_desc" placeholder="描述该功能的作用" rows="2"></textarea>
             </div>
             <div class="form-group">
                 <label>设计要求</label>
-                <input v-model="funcForm.requirement" placeholder="功能需要满足的设计要求">
+                <textarea v-model="funcForm.requirement" placeholder="功能需要满足的设计要求" rows="3"></textarea>
             </div>
             <div class="form-group">
                 <label>性能指标</label>
-                <input v-model="funcForm.performance_spec" placeholder="量化的性能指标（如精度、响应时间等）">
+                <textarea v-model="funcForm.performance_spec" placeholder="量化的性能指标（如精度、响应时间等）" rows="4"></textarea>
             </div>
             <div class="form-group">
                 <label>接口说明</label>
-                <input v-model="funcForm.interface_desc" placeholder="输入/输出接口描述">
+                <textarea v-model="funcForm.interface_desc" placeholder="输入/输出接口描述" rows="3"></textarea>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-ghost" @click="showFuncModal=false">取消</button>
@@ -299,7 +299,7 @@
     </div>
 
     <!-- 批量导入模态框 -->
-    <div v-if="showBatchModal" class="modal-overlay" @click.self="showBatchModal=false">
+    <div v-if="showBatchModal" class="modal-overlay">
         <div class="modal">
             <h2>批量导入功能项</h2>
             <p class="text-muted mb-1" style="font-size:.85rem">每行输入一个功能描述，将自动创建多条功能项</p>
@@ -314,8 +314,8 @@
     </div>
 
     <!-- DFMEA 编辑模态框 -->
-    <div v-if="showDfmeaModal" class="modal-overlay" @click.self="showDfmeaModal=false">
-        <div class="modal" style="max-width:960px;min-width:820px;padding:0;overflow:hidden">
+    <div v-if="showDfmeaModal" class="modal-overlay">
+        <div class="modal" style="max-width:1060px;min-width:860px;padding:0;overflow:hidden">
             <!-- Header -->
             <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem">
                 <h2 style="margin:0;flex:1">[[ editingDfmea ? '编辑失效模式' : '添加失效模式' ]]</h2>
@@ -347,7 +347,7 @@
                             </div>
                             <div class="form-group" style="flex:1.5">
                                 <label>失效模式</label>
-                                <input v-model="dfmeaForm.mode_desc" placeholder="描述失效的表现形式">
+                                <textarea v-model="dfmeaForm.mode_desc" placeholder="描述失效的表现形式" rows="2"></textarea>
                             </div>
                         </div>
                     </div>
@@ -358,11 +358,11 @@
                         <div class="form-row">
                             <div class="form-group" style="flex:1">
                                 <label>对当前元素</label>
-                                <input v-model="dfmeaForm.local_effect" placeholder="对当前部件/子系统的影响">
+                                <textarea v-model="dfmeaForm.local_effect" placeholder="对当前部件/子系统的影响" rows="2"></textarea>
                             </div>
                             <div class="form-group" style="flex:1">
                                 <label>对系统 / 整机</label>
-                                <input v-model="dfmeaForm.potential_effect" placeholder="对上层系统或最终客户的影响">
+                                <textarea v-model="dfmeaForm.potential_effect" placeholder="对上层系统或最终客户的影响" rows="2"></textarea>
                             </div>
                         </div>
                     </div>
@@ -371,9 +371,10 @@
                     <div class="section-card">
                         <div class="section-title">失效原因</div>
                         <div class="chip-list" v-if="dfmeaItems.potential_cause.filter(s=>s.trim()).length > 0">
-                            <span class="chip" v-for="(item, i) in dfmeaItems.potential_cause" :key="'c'+i" v-show="item.trim()">
+                            <span class="chip" v-for="(item, i) in dfmeaItems.potential_cause" :key="'c'+i" v-show="item.trim()"
+                                @click="newCause = item; dfmeaItems.potential_cause.splice(i,1); onDfmeaItemChange()">
                                 <span class="chip-text" :title="item">[[ item ]]</span>
-                                <span class="chip-remove" @click="dfmeaItems.potential_cause.splice(i,1); onDfmeaItemChange()">×</span>
+                                <span class="chip-remove" @click.stop="dfmeaItems.potential_cause.splice(i,1); onDfmeaItemChange()">×</span>
                             </span>
                         </div>
                         <div class="chip-add-row">
@@ -388,9 +389,10 @@
                     <div class="section-card">
                         <div class="section-title">预防控制 <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.75rem">— 防止失效原因发生</span></div>
                         <div class="chip-list" v-if="dfmeaItems.prevention_control.filter(s=>s.trim()).length > 0">
-                            <span class="chip" v-for="(item, i) in dfmeaItems.prevention_control" :key="'p'+i" v-show="item.trim()">
+                            <span class="chip" v-for="(item, i) in dfmeaItems.prevention_control" :key="'p'+i" v-show="item.trim()"
+                                @click="newPrevention = item; dfmeaItems.prevention_control.splice(i,1); onDfmeaItemChange()">
                                 <span class="chip-text" :title="item">[[ item ]]</span>
-                                <span class="chip-remove" @click="dfmeaItems.prevention_control.splice(i,1); onDfmeaItemChange()">×</span>
+                                <span class="chip-remove" @click.stop="dfmeaItems.prevention_control.splice(i,1); onDfmeaItemChange()">×</span>
                             </span>
                         </div>
                         <div class="chip-add-row">
@@ -405,10 +407,11 @@
                     <div class="section-card">
                         <div class="section-title">探测控制 <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.75rem">— 选择阶段 + 具体方法</span></div>
                         <div class="chip-list" v-if="dfmeaItems.detection_control.filter(s=>s.trim()).length > 0">
-                            <span class="chip" v-for="(item, i) in dfmeaItems.detection_control" :key="'d'+i" v-show="item.trim()">
+                            <span class="chip" v-for="(item, i) in dfmeaItems.detection_control" :key="'d'+i" v-show="item.trim()"
+                                @click="newDetectCat = getDetectCat(item); newDetection = item.replace(/^\[.*?\]\s?/, ''); dfmeaItems.detection_control.splice(i,1); onDfmeaItemChange()">
                                 <span v-if="getDetectCat(item)" class="tag" style="font-size:.65rem;margin-right:2px;background:var(--primary-light);color:var(--primary-text);flex-shrink:0">[[ getDetectCat(item) ]]</span>
                                 <span class="chip-text" :title="item">[[ item.replace(/^\[.*?\]\s?/, '') ]]</span>
-                                <span class="chip-remove" @click="dfmeaItems.detection_control.splice(i,1); onDfmeaItemChange()">×</span>
+                                <span class="chip-remove" @click.stop="dfmeaItems.detection_control.splice(i,1); onDfmeaItemChange()">×</span>
                             </span>
                         </div>
                         <div class="chip-add-row">
@@ -427,9 +430,10 @@
                     <div class="section-card">
                         <div class="section-title">建议措施 <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.75rem">— 针对高风险项的改进措施</span></div>
                         <div class="chip-list" v-if="dfmeaItems.recommended_action.filter(s=>s.trim()).length > 0">
-                            <span class="chip" v-for="(item, i) in dfmeaItems.recommended_action" :key="'r'+i" v-show="item.trim()">
+                            <span class="chip" v-for="(item, i) in dfmeaItems.recommended_action" :key="'r'+i" v-show="item.trim()"
+                                @click="newAction = item; dfmeaItems.recommended_action.splice(i,1); onDfmeaItemChange()">
                                 <span class="chip-text" :title="item">[[ item ]]</span>
-                                <span class="chip-remove" @click="dfmeaItems.recommended_action.splice(i,1); onDfmeaItemChange()">×</span>
+                                <span class="chip-remove" @click.stop="dfmeaItems.recommended_action.splice(i,1); onDfmeaItemChange()">×</span>
                             </span>
                         </div>
                         <div class="chip-add-row">
@@ -546,7 +550,7 @@
     </div>
 
     <!-- 评分准则参考弹窗 -->
-    <div v-if="showCriteria" class="modal-overlay" @click.self="showCriteria=false">
+    <div v-if="showCriteria" class="modal-overlay">
         <div class="modal" style="max-width:800px;min-width:640px">
             <h2>S / O / D 评分准则 (AIAG-VDA)</h2>
             <div v-for="t in ['S', 'O', 'D']" :key="t" style="margin-bottom:1rem">
@@ -567,7 +571,7 @@
     </div>
 
     <!-- 参考材料 — 文件上传模态框 -->
-    <div v-if="showRefUpload" class="modal-overlay" @click.self="showRefUpload=false">
+    <div v-if="showRefUpload" class="modal-overlay">
         <div class="modal" style="max-width:460px">
             <h2>上传参考文件</h2>
             <div class="form-group"><label>标题 <span style="color:var(--danger)">*</span></label><input v-model="refForm.title" placeholder="材料名称"></div>
@@ -589,7 +593,7 @@
     </div>
 
     <!-- 参考材料 — 外部链接模态框 -->
-    <div v-if="showRefUrl" class="modal-overlay" @click.self="showRefUrl=false">
+    <div v-if="showRefUrl" class="modal-overlay">
         <div class="modal" style="max-width:460px">
             <h2>添加参考链接</h2>
             <div class="form-group"><label>标题 <span style="color:var(--danger)">*</span></label><input v-model="refForm.title" placeholder="链接名称"></div>
@@ -1149,8 +1153,11 @@ createApp({
             try {
                 failures.value = await API.get('/api/v1/nodes/' + activeNodeId.value + '/failures');
             } catch (e) { failures.value = []; }
-            // 加载所有已有失效模式用于快速填充（跨项目通用）
             loadAllFailuresForFill();
+            Vue.nextTick(() => {
+                const table = document.querySelector('.dfmea-table');
+                if (table) initColumnResize(table);
+            });
         }
 
         async function loadAllFailuresForFill() {

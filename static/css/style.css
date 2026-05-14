@@ -1,16 +1,13 @@
 /* ============================================================
    DFMEA 个人记录系统 — 全局样式
-   桌面端优先 (1920×1080+), 支持亮色/暗色/自动主题
-   ============================================================ */
-
-/* ============================================================
-   8-Theme System — Full palette per theme (light + dark)
-   data-color-theme = color palette (teal | blue | indigo | emerald | slate | amber | rose | violet)
+   桌面端优先 (1920×1080+), 3套阅读友好主题 (light + dark)
+   data-color-theme = slate | latte | steel
    data-theme       = mode (absent/auto | light | dark)
    ============================================================ */
 
-/* --- Shared invariants (font, radius, shadow, transition) --- */
-:root {
+/* --- Shared invariants (font, radius, shadow, transition) + Slate defaults --- */
+:root,
+:root[data-color-theme="slate"] {
     --font: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
     --font-mono: "Cascadia Code", "Fira Code", "JetBrains Mono", "Consolas", monospace;
     --radius: 8px; --radius-sm: 4px;
@@ -18,158 +15,7 @@
     --shadow: 0 2px 16px rgba(0,0,0,.07);
     --shadow-lg: 0 8px 30px rgba(0,0,0,.10);
     --transition: 180ms ease;
-}
 
-/* ============================================================
-   1. Teal 青绿 — fresh & professional
-   ============================================================ */
-:root,
-:root[data-color-theme="teal"] {
-    --bg: #eff2f1; --surface: #f7faf8; --surface-hover: #ecf2ef;
-    --text: #1a2320; --text-secondary: #53635e; --text-muted: #849690;
-    --border: #dce4e0; --border-light: #e8efeb;
-    --primary: #0d9488; --primary-hover: #0f766e; --primary-light: #e8f8f5; --primary-text: #0f766e;
-    --danger: #e44949; --danger-hover: #c53030; --danger-light: #fef5f5;
-    --success: #16a34a; --success-light: #f0fdf6;
-    --warning: #d97706; --warning-light: #fffbeb;
-    --rpn-high-bg: #fef3f3; --rpn-high-border: #fecaca; --rpn-high-text: #b91c1c;
-    --rpn-mid-bg: #fffbeb; --rpn-mid-border: #fde68a; --rpn-mid-text: #a16207;
-    --score-h-bg: #fee2e2; --score-h-text: #dc2626; --score-h-ring: #fca5a5;
-    --score-m-bg: #fef3c7; --score-m-text: #d97706; --score-m-ring: #fcd34d;
-    --score-l-bg: #dcfce7; --score-l-text: #16a34a; --score-l-ring: #86efac;
-    --ap-h-bg: #fef2f2; --ap-h-text: #dc2626; --ap-m-bg: #fffbeb; --ap-m-text: #d97706;
-    --ap-l-bg: #f0fdf4; --ap-l-text: #16a34a;
-    --scrollbar-thumb: #c4cdd5; --scrollbar-thumb-hover: #8d99a8;
-}
-:root[data-theme="dark"],
-:root[data-theme="dark"][data-color-theme="teal"] {
-    --bg: #182320; --surface: #1f302b; --surface-hover: #273c36;
-    --text: #e2ece7; --text-secondary: #9db5ab; --text-muted: #6b857b;
-    --border: #2d423b; --border-light: #253831;
-    --primary: #2dd4bf; --primary-hover: #5eead4; --primary-light: #0d2e2b; --primary-text: #5eead4;
-    --danger: #fca5a5; --danger-hover: #f87171; --danger-light: #451a1a;
-    --success: #4ade80; --success-light: #0d3320;
-    --warning: #fbbf24; --warning-light: #452c0a;
-    --rpn-high-bg: #4a1a1a; --rpn-high-border: #7f1d1d; --rpn-high-text: #fca5a5;
-    --rpn-mid-bg: #4a3520; --rpn-mid-border: #78350f; --rpn-mid-text: #fcd34d;
-    --score-h-bg: #7f1d1d; --score-h-text: #fca5a5; --score-h-ring: #dc2626;
-    --score-m-bg: #78350f; --score-m-text: #fcd34d; --score-m-ring: #d97706;
-    --score-l-bg: #14532d; --score-l-text: #86efac; --score-l-ring: #16a34a;
-    --scrollbar-thumb: #3d5249; --scrollbar-thumb-hover: #5a7568;
-}
-
-/* ============================================================
-   2. Blue 深蓝 — industrial & trustworthy
-   ============================================================ */
-:root[data-color-theme="blue"] {
-    --bg: #eef2f8; --surface: #f6f9fd; --surface-hover: #eaf0f8;
-    --text: #18202d; --text-secondary: #4a556e; --text-muted: #7d8ba5;
-    --border: #d8e0ec; --border-light: #e4ecf5;
-    --primary: #2563eb; --primary-hover: #1d4ed8; --primary-light: #e8f0fe; --primary-text: #1d4ed8;
-    --danger: #e44949; --danger-hover: #c53030; --danger-light: #fef5f5;
-    --success: #16a34a; --success-light: #f0fdf6;
-    --warning: #d97706; --warning-light: #fffbeb;
-    --rpn-high-bg: #fef3f3; --rpn-high-border: #fecaca; --rpn-high-text: #b91c1c;
-    --rpn-mid-bg: #fffbeb; --rpn-mid-border: #fde68a; --rpn-mid-text: #a16207;
-    --score-h-bg: #fee2e2; --score-h-text: #dc2626; --score-h-ring: #fca5a5;
-    --score-m-bg: #fef3c7; --score-m-text: #d97706; --score-m-ring: #fcd34d;
-    --score-l-bg: #dcfce7; --score-l-text: #16a34a; --score-l-ring: #86efac;
-    --ap-h-bg: #fef2f2; --ap-h-text: #dc2626; --ap-m-bg: #fffbeb; --ap-m-text: #d97706;
-    --ap-l-bg: #f0fdf4; --ap-l-text: #16a34a;
-    --scrollbar-thumb: #c4cdd9; --scrollbar-thumb-hover: #8d9ab0;
-}
-:root[data-theme="dark"][data-color-theme="blue"] {
-    --bg: #181f2a; --surface: #1f293a; --surface-hover: #273348;
-    --text: #e0e7f2; --text-secondary: #96a8c2; --text-muted: #647694;
-    --border: #2d3a50; --border-light: #253044;
-    --primary: #60a5fa; --primary-hover: #93bbfd; --primary-light: #172554; --primary-text: #93bbfd;
-    --danger: #fca5a5; --danger-hover: #f87171; --danger-light: #451a1a;
-    --success: #4ade80; --success-light: #0d3320;
-    --warning: #fbbf24; --warning-light: #452c0a;
-    --rpn-high-bg: #4a1a1a; --rpn-high-border: #7f1d1d; --rpn-high-text: #fca5a5;
-    --rpn-mid-bg: #4a3520; --rpn-mid-border: #78350f; --rpn-mid-text: #fcd34d;
-    --score-h-bg: #7f1d1d; --score-h-text: #fca5a5; --score-h-ring: #dc2626;
-    --score-m-bg: #78350f; --score-m-text: #fcd34d; --score-m-ring: #d97706;
-    --score-l-bg: #14532d; --score-l-text: #86efac; --score-l-ring: #16a34a;
-    --scrollbar-thumb: #3d4a60; --scrollbar-thumb-hover: #5a6d8a;
-}
-
-/* ============================================================
-   3. Indigo 靛紫 — modern SaaS
-   ============================================================ */
-:root[data-color-theme="indigo"] {
-    --bg: #f1f0f8; --surface: #f9f8fd; --surface-hover: #efedf7;
-    --text: #1c1930; --text-secondary: #4e4a6b; --text-muted: #817da0;
-    --border: #ddd9ec; --border-light: #e8e4f5;
-    --primary: #6366f1; --primary-hover: #4f46e5; --primary-light: #ecedfe; --primary-text: #4f46e5;
-    --danger: #e44949; --danger-hover: #c53030; --danger-light: #fef5f5;
-    --success: #16a34a; --success-light: #f0fdf6;
-    --warning: #d97706; --warning-light: #fffbeb;
-    --rpn-high-bg: #fef3f3; --rpn-high-border: #fecaca; --rpn-high-text: #b91c1c;
-    --rpn-mid-bg: #fffbeb; --rpn-mid-border: #fde68a; --rpn-mid-text: #a16207;
-    --score-h-bg: #fee2e2; --score-h-text: #dc2626; --score-h-ring: #fca5a5;
-    --score-m-bg: #fef3c7; --score-m-text: #d97706; --score-m-ring: #fcd34d;
-    --score-l-bg: #dcfce7; --score-l-text: #16a34a; --score-l-ring: #86efac;
-    --ap-h-bg: #fef2f2; --ap-h-text: #dc2626; --ap-m-bg: #fffbeb; --ap-m-text: #d97706;
-    --ap-l-bg: #f0fdf4; --ap-l-text: #16a34a;
-    --scrollbar-thumb: #c8c4db; --scrollbar-thumb-hover: #9590b5;
-}
-:root[data-theme="dark"][data-color-theme="indigo"] {
-    --bg: #1c1a28; --surface: #252237; --surface-hover: #2f2b45;
-    --text: #e0ddf2; --text-secondary: #a7a0cc; --text-muted: #756ea6;
-    --border: #363150; --border-light: #2d2942;
-    --primary: #a5b4fc; --primary-hover: #c7d2fe; --primary-light: #1e1b4b; --primary-text: #c7d2fe;
-    --danger: #fca5a5; --danger-hover: #f87171; --danger-light: #451a1a;
-    --success: #4ade80; --success-light: #0d3320;
-    --warning: #fbbf24; --warning-light: #452c0a;
-    --rpn-high-bg: #4a1a1a; --rpn-high-border: #7f1d1d; --rpn-high-text: #fca5a5;
-    --rpn-mid-bg: #4a3520; --rpn-mid-border: #78350f; --rpn-mid-text: #fcd34d;
-    --score-h-bg: #7f1d1d; --score-h-text: #fca5a5; --score-h-ring: #dc2626;
-    --score-m-bg: #78350f; --score-m-text: #fcd34d; --score-m-ring: #d97706;
-    --score-l-bg: #14532d; --score-l-text: #86efac; --score-l-ring: #16a34a;
-    --scrollbar-thumb: #443f60; --scrollbar-thumb-hover: #625b8a;
-}
-
-/* ============================================================
-   4. Emerald 墨绿 — engineering & calm
-   ============================================================ */
-:root[data-color-theme="emerald"] {
-    --bg: #eef4f0; --surface: #f6fbf8; --surface-hover: #eaf2ed;
-    --text: #18261e; --text-secondary: #44604e; --text-muted: #6e8d79;
-    --border: #d4e2d8; --border-light: #e1efe6;
-    --primary: #059669; --primary-hover: #047857; --primary-light: #e6f7ef; --primary-text: #047857;
-    --danger: #e44949; --danger-hover: #c53030; --danger-light: #fef5f5;
-    --success: #16a34a; --success-light: #f0fdf6;
-    --warning: #d97706; --warning-light: #fffbeb;
-    --rpn-high-bg: #fef3f3; --rpn-high-border: #fecaca; --rpn-high-text: #b91c1c;
-    --rpn-mid-bg: #fffbeb; --rpn-mid-border: #fde68a; --rpn-mid-text: #a16207;
-    --score-h-bg: #fee2e2; --score-h-text: #dc2626; --score-h-ring: #fca5a5;
-    --score-m-bg: #fef3c7; --score-m-text: #d97706; --score-m-ring: #fcd34d;
-    --score-l-bg: #dcfce7; --score-l-text: #16a34a; --score-l-ring: #86efac;
-    --ap-h-bg: #fef2f2; --ap-h-text: #dc2626; --ap-m-bg: #fffbeb; --ap-m-text: #d97706;
-    --ap-l-bg: #f0fdf4; --ap-l-text: #16a34a;
-    --scrollbar-thumb: #c0d0c5; --scrollbar-thumb-hover: #89a090;
-}
-:root[data-theme="dark"][data-color-theme="emerald"] {
-    --bg: #17241c; --surface: #1d3025; --surface-hover: #253d2f;
-    --text: #dcebe3; --text-secondary: #90b89e; --text-muted: #5f8a6e;
-    --border: #2a4232; --border-light: #223829;
-    --primary: #34d399; --primary-hover: #6ee7b7; --primary-light: #064e3b; --primary-text: #6ee7b7;
-    --danger: #fca5a5; --danger-hover: #f87171; --danger-light: #451a1a;
-    --success: #4ade80; --success-light: #0d3320;
-    --warning: #fbbf24; --warning-light: #452c0a;
-    --rpn-high-bg: #4a1a1a; --rpn-high-border: #7f1d1d; --rpn-high-text: #fca5a5;
-    --rpn-mid-bg: #4a3520; --rpn-mid-border: #78350f; --rpn-mid-text: #fcd34d;
-    --score-h-bg: #7f1d1d; --score-h-text: #fca5a5; --score-h-ring: #dc2626;
-    --score-m-bg: #78350f; --score-m-text: #fcd34d; --score-m-ring: #d97706;
-    --score-l-bg: #14532d; --score-l-text: #86efac; --score-l-ring: #16a34a;
-    --scrollbar-thumb: #3a4e40; --scrollbar-thumb-hover: #56705e;
-}
-
-/* ============================================================
-   5. Slate 灰蓝 — minimal & IDE-like
-   ============================================================ */
-:root[data-color-theme="slate"] {
     --bg: #f0f2f5; --surface: #f9fafb; --surface-hover: #eef1f4;
     --text: #1a2129; --text-secondary: #4b5563; --text-muted: #7d8b99;
     --border: #dde1e6; --border-light: #e8ecf0;
@@ -186,6 +32,9 @@
     --ap-l-bg: #f0fdf4; --ap-l-text: #16a34a;
     --scrollbar-thumb: #c8cfd8; --scrollbar-thumb-hover: #94a0ad;
 }
+
+/* 1. Slate 灰蓝 — minimal reading-focused */
+:root[data-theme="dark"],
 :root[data-theme="dark"][data-color-theme="slate"] {
     --bg: #1a2128; --surface: #232c35; --surface-hover: #2b3641;
     --text: #e2e8f0; --text-secondary: #94a3b8; --text-muted: #64748b;
@@ -202,17 +51,15 @@
     --scrollbar-thumb: #3d4855; --scrollbar-thumb-hover: #5a6a7c;
 }
 
-/* ============================================================
-   6. Amber 琥珀 — warm & eye-comfortable
-   ============================================================ */
-:root[data-color-theme="amber"] {
-    --bg: #f6f2ea; --surface: #fdfaf6; --surface-hover: #f5efe2;
-    --text: #231f16; --text-secondary: #5c5240; --text-muted: #8f826e;
-    --border: #e6ddd0; --border-light: #f0e9dd;
-    --primary: #d97706; --primary-hover: #b45309; --primary-light: #fef7ed; --primary-text: #b45309;
-    --danger: #e44949; --danger-hover: #c53030; --danger-light: #fef5f5;
-    --success: #16a34a; --success-light: #f0fdf6;
-    --warning: #d97706; --warning-light: #fffbeb;
+/* 2. Latte 拿铁 — warm cream, best for long sessions */
+:root[data-color-theme="latte"] {
+    --bg: #f6f2ed; --surface: #fdfbf8; --surface-hover: #f3ece3;
+    --text: #2a231a; --text-secondary: #6b5e4e; --text-muted: #988c7a;
+    --border: #e2d9cc; --border-light: #ede5da;
+    --primary: #8b6914; --primary-hover: #70520c; --primary-light: #fdf6e8; --primary-text: #70520c;
+    --danger: #c53030; --danger-hover: #9b2c2c; --danger-light: #fef5f5;
+    --success: #0f7b3a; --success-light: #f0fdf6;
+    --warning: #b45309; --warning-light: #fffbeb;
     --rpn-high-bg: #fef3f3; --rpn-high-border: #fecaca; --rpn-high-text: #b91c1c;
     --rpn-mid-bg: #fffbeb; --rpn-mid-border: #fde68a; --rpn-mid-text: #a16207;
     --score-h-bg: #fee2e2; --score-h-text: #dc2626; --score-h-ring: #fca5a5;
@@ -220,13 +67,13 @@
     --score-l-bg: #dcfce7; --score-l-text: #16a34a; --score-l-ring: #86efac;
     --ap-h-bg: #fef2f2; --ap-h-text: #dc2626; --ap-m-bg: #fffbeb; --ap-m-text: #d97706;
     --ap-l-bg: #f0fdf4; --ap-l-text: #16a34a;
-    --scrollbar-thumb: #d5cdbc; --scrollbar-thumb-hover: #a89880;
+    --scrollbar-thumb: #d5cdbe; --scrollbar-thumb-hover: #a89880;
 }
-:root[data-theme="dark"][data-color-theme="amber"] {
-    --bg: #221e16; --surface: #2e2820; --surface-hover: #3a3328;
+:root[data-theme="dark"][data-color-theme="latte"] {
+    --bg: #241e16; --surface: #302820; --surface-hover: #3d3428;
     --text: #ede4d4; --text-secondary: #b8a88e; --text-muted: #82745e;
     --border: #423a2d; --border-light: #363025;
-    --primary: #fbbf24; --primary-hover: #fcd34d; --primary-light: #452c0a; --primary-text: #fcd34d;
+    --primary: #d4a83a; --primary-hover: #e8c55a; --primary-light: #3d2e10; --primary-text: #e8c55a;
     --danger: #fca5a5; --danger-hover: #f87171; --danger-light: #451a1a;
     --success: #4ade80; --success-light: #0d3320;
     --warning: #fbbf24; --warning-light: #452c0a;
@@ -238,17 +85,15 @@
     --scrollbar-thumb: #4e4436; --scrollbar-thumb-hover: #6e6250;
 }
 
-/* ============================================================
-   7. Rose 玫红 — vibrant & energetic
-   ============================================================ */
-:root[data-color-theme="rose"] {
-    --bg: #f7f0f2; --surface: #fdf8f9; --surface-hover: #f5ebee;
-    --text: #24171b; --text-secondary: #5c424a; --text-muted: #8f6e79;
-    --border: #e8d7dc; --border-light: #f2e6ea;
-    --primary: #e11d48; --primary-hover: #be123c; --primary-light: #feeef1; --primary-text: #be123c;
-    --danger: #e44949; --danger-hover: #c53030; --danger-light: #fef5f5;
-    --success: #16a34a; --success-light: #f0fdf6;
-    --warning: #d97706; --warning-light: #fffbeb;
+/* 3. Steel 钢青 — professional data workspace */
+:root[data-color-theme="steel"] {
+    --bg: #f1f4f7; --surface: #f9fafc; --surface-hover: #eaf0f4;
+    --text: #17202a; --text-secondary: #405468; --text-muted: #7089a0;
+    --border: #d6dee5; --border-light: #e4ebf1;
+    --primary: #2c6280; --primary-hover: #1e4d67; --primary-light: #edf4f8; --primary-text: #1e4d67;
+    --danger: #d14343; --danger-hover: #b53535; --danger-light: #fef5f5;
+    --success: #148a42; --success-light: #f0fdf6;
+    --warning: #c26a0a; --warning-light: #fffbeb;
     --rpn-high-bg: #fef3f3; --rpn-high-border: #fecaca; --rpn-high-text: #b91c1c;
     --rpn-mid-bg: #fffbeb; --rpn-mid-border: #fde68a; --rpn-mid-text: #a16207;
     --score-h-bg: #fee2e2; --score-h-text: #dc2626; --score-h-ring: #fca5a5;
@@ -256,13 +101,13 @@
     --score-l-bg: #dcfce7; --score-l-text: #16a34a; --score-l-ring: #86efac;
     --ap-h-bg: #fef2f2; --ap-h-text: #dc2626; --ap-m-bg: #fffbeb; --ap-m-text: #d97706;
     --ap-l-bg: #f0fdf4; --ap-l-text: #16a34a;
-    --scrollbar-thumb: #dccdd3; --scrollbar-thumb-hover: #b0959e;
+    --scrollbar-thumb: #c4cfd9; --scrollbar-thumb-hover: #8c9eb0;
 }
-:root[data-theme="dark"][data-color-theme="rose"] {
-    --bg: #24181c; --surface: #302026; --surface-hover: #3d2830;
-    --text: #eddde3; --text-secondary: #c4a0ad; --text-muted: #8f6e7a;
-    --border: #452d34; --border-light: #38242b;
-    --primary: #fda4af; --primary-hover: #fecdd3; --primary-light: #4a1525; --primary-text: #fecdd3;
+:root[data-theme="dark"][data-color-theme="steel"] {
+    --bg: #17212a; --surface: #1e2b37; --surface-hover: #263544;
+    --text: #e0e7f0; --text-secondary: #8ea4bc; --text-muted: #5d7996;
+    --border: #2d4052; --border-light: #243647;
+    --primary: #7ba8cc; --primary-hover: #a0c4e0; --primary-light: #142c3d; --primary-text: #a0c4e0;
     --danger: #fca5a5; --danger-hover: #f87171; --danger-light: #451a1a;
     --success: #4ade80; --success-light: #0d3320;
     --warning: #fbbf24; --warning-light: #452c0a;
@@ -271,97 +116,30 @@
     --score-h-bg: #7f1d1d; --score-h-text: #fca5a5; --score-h-ring: #dc2626;
     --score-m-bg: #78350f; --score-m-text: #fcd34d; --score-m-ring: #d97706;
     --score-l-bg: #14532d; --score-l-text: #86efac; --score-l-ring: #16a34a;
-    --scrollbar-thumb: #503a42; --scrollbar-thumb-hover: #725660;
+    --scrollbar-thumb: #3d4d5e; --scrollbar-thumb-hover: #5a6f84;
 }
 
-/* ============================================================
-   8. Violet 紫罗兰 — creative & distinctive
-   ============================================================ */
-:root[data-color-theme="violet"] {
-    --bg: #f3f0f8; --surface: #faf8fd; --surface-hover: #f0ebf7;
-    --text: #1d192b; --text-secondary: #514a6b; --text-muted: #8078a0;
-    --border: #e0d9ec; --border-light: #ebe5f5;
-    --primary: #7c3aed; --primary-hover: #6d28d9; --primary-light: #f2edfe; --primary-text: #6d28d9;
-    --danger: #e44949; --danger-hover: #c53030; --danger-light: #fef5f5;
-    --success: #16a34a; --success-light: #f0fdf6;
-    --warning: #d97706; --warning-light: #fffbeb;
-    --rpn-high-bg: #fef3f3; --rpn-high-border: #fecaca; --rpn-high-text: #b91c1c;
-    --rpn-mid-bg: #fffbeb; --rpn-mid-border: #fde68a; --rpn-mid-text: #a16207;
-    --score-h-bg: #fee2e2; --score-h-text: #dc2626; --score-h-ring: #fca5a5;
-    --score-m-bg: #fef3c7; --score-m-text: #d97706; --score-m-ring: #fcd34d;
-    --score-l-bg: #dcfce7; --score-l-text: #16a34a; --score-l-ring: #86efac;
-    --ap-h-bg: #fef2f2; --ap-h-text: #dc2626; --ap-m-bg: #fffbeb; --ap-m-text: #d97706;
-    --ap-l-bg: #f0fdf4; --ap-l-text: #16a34a;
-    --scrollbar-thumb: #cbc4dd; --scrollbar-thumb-hover: #9690b8;
-}
-:root[data-theme="dark"][data-color-theme="violet"] {
-    --bg: #1d1928; --surface: #272133; --surface-hover: #332b42;
-    --text: #e1dcf2; --text-secondary: #aba0cc; --text-muted: #7a6ea6;
-    --border: #393350; --border-light: #302a42;
-    --primary: #a78bfa; --primary-hover: #c4b5fd; --primary-light: #2e1065; --primary-text: #c4b5fd;
-    --danger: #fca5a5; --danger-hover: #f87171; --danger-light: #451a1a;
-    --success: #4ade80; --success-light: #0d3320;
-    --warning: #fbbf24; --warning-light: #452c0a;
-    --rpn-high-bg: #4a1a1a; --rpn-high-border: #7f1d1d; --rpn-high-text: #fca5a5;
-    --rpn-mid-bg: #4a3520; --rpn-mid-border: #78350f; --rpn-mid-text: #fcd34d;
-    --score-h-bg: #7f1d1d; --score-h-text: #fca5a5; --score-h-ring: #dc2626;
-    --score-m-bg: #78350f; --score-m-text: #fcd34d; --score-m-ring: #d97706;
-    --score-l-bg: #14532d; --score-l-text: #86efac; --score-l-ring: #16a34a;
-    --scrollbar-thumb: #443c60; --scrollbar-thumb-hover: #625a88;
-}
-
-/* --- Auto dark mode (when no explicit data-theme) --- */
+/* --- Auto dark mode --- */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]):not([data-color-theme]),
-    :root:not([data-theme="light"])[data-color-theme="teal"] {
-        --bg: #182320; --surface: #1f302b; --surface-hover: #273c36;
-        --text: #e2ece7; --text-secondary: #9db5ab; --text-muted: #6b857b;
-        --border: #2d423b; --border-light: #253831;
-        --primary: #2dd4bf; --primary-hover: #5eead4; --primary-light: #0d2e2b; --primary-text: #5eead4;
-    }
-    :root:not([data-theme="light"])[data-color-theme="blue"] {
-        --bg: #181f2a; --surface: #1f293a; --surface-hover: #273348;
-        --text: #e0e7f2; --text-secondary: #96a8c2; --text-muted: #647694;
-        --border: #2d3a50; --border-light: #253044;
-        --primary: #60a5fa; --primary-hover: #93bbfd; --primary-light: #172554; --primary-text: #93bbfd;
-    }
-    :root:not([data-theme="light"])[data-color-theme="indigo"] {
-        --bg: #1c1a28; --surface: #252237; --surface-hover: #2f2b45;
-        --text: #e0ddf2; --text-secondary: #a7a0cc; --text-muted: #756ea6;
-        --border: #363150; --border-light: #2d2942;
-        --primary: #a5b4fc; --primary-hover: #c7d2fe; --primary-light: #1e1b4b; --primary-text: #c7d2fe;
-    }
-    :root:not([data-theme="light"])[data-color-theme="emerald"] {
-        --bg: #17241c; --surface: #1d3025; --surface-hover: #253d2f;
-        --text: #dcebe3; --text-secondary: #90b89e; --text-muted: #5f8a6e;
-        --border: #2a4232; --border-light: #223829;
-        --primary: #34d399; --primary-hover: #6ee7b7; --primary-light: #064e3b; --primary-text: #6ee7b7;
-    }
     :root:not([data-theme="light"])[data-color-theme="slate"] {
         --bg: #1a2128; --surface: #232c35; --surface-hover: #2b3641;
         --text: #e2e8f0; --text-secondary: #94a3b8; --text-muted: #64748b;
         --border: #334155; --border-light: #293548;
         --primary: #94a3b8; --primary-hover: #b0bec5; --primary-light: #1e293b; --primary-text: #b0bec5;
     }
-    :root:not([data-theme="light"])[data-color-theme="amber"] {
-        --bg: #221e16; --surface: #2e2820; --surface-hover: #3a3328;
+    :root:not([data-theme="light"])[data-color-theme="latte"] {
+        --bg: #241e16; --surface: #302820; --surface-hover: #3d3428;
         --text: #ede4d4; --text-secondary: #b8a88e; --text-muted: #82745e;
         --border: #423a2d; --border-light: #363025;
-        --primary: #fbbf24; --primary-hover: #fcd34d; --primary-light: #452c0a; --primary-text: #fcd34d;
+        --primary: #d4a83a; --primary-hover: #e8c55a; --primary-light: #3d2e10; --primary-text: #e8c55a;
     }
-    :root:not([data-theme="light"])[data-color-theme="rose"] {
-        --bg: #24181c; --surface: #302026; --surface-hover: #3d2830;
-        --text: #eddde3; --text-secondary: #c4a0ad; --text-muted: #8f6e7a;
-        --border: #452d34; --border-light: #38242b;
-        --primary: #fda4af; --primary-hover: #fecdd3; --primary-light: #4a1525; --primary-text: #fecdd3;
+    :root:not([data-theme="light"])[data-color-theme="steel"] {
+        --bg: #17212a; --surface: #1e2b37; --surface-hover: #263544;
+        --text: #e0e7f0; --text-secondary: #8ea4bc; --text-muted: #5d7996;
+        --border: #2d4052; --border-light: #243647;
+        --primary: #7ba8cc; --primary-hover: #a0c4e0; --primary-light: #142c3d; --primary-text: #a0c4e0;
     }
-    :root:not([data-theme="light"])[data-color-theme="violet"] {
-        --bg: #1d1928; --surface: #272133; --surface-hover: #332b42;
-        --text: #e1dcf2; --text-secondary: #aba0cc; --text-muted: #7a6ea6;
-        --border: #393350; --border-light: #302a42;
-        --primary: #a78bfa; --primary-hover: #c4b5fd; --primary-light: #2e1065; --primary-text: #c4b5fd;
-    }
-    /* dark risk colors (shared) */
     :root:not([data-theme="light"]) {
         --danger: #fca5a5; --danger-hover: #f87171; --danger-light: #451a1a;
         --success: #4ade80; --success-light: #0d3320;
@@ -392,8 +170,9 @@
     padding: .75rem;
     animation: fadeIn .12s ease;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: .5rem;
+    width: 240px;
 }
 .theme-swatch {
     display: flex; flex-direction: column; align-items: center; gap: .3rem;
@@ -668,7 +447,11 @@ h3 { font-size: 1.1rem; font-weight: 600; }
     background: var(--primary);
 }
 .main-content {
-    flex: 1; overflow: auto; padding: 0 1.5rem;
+    flex: 1; overflow: hidden; padding: 0 1.5rem;
+    display: flex; flex-direction: column;
+}
+.dfmea-tab-content {
+    display: flex; flex-direction: column; flex: 1; min-height: 0;
 }
 
 /* ── Node Edit Form ── */
@@ -779,32 +562,50 @@ h3 { font-size: 1.1rem; font-weight: 600; }
     border: 1px solid var(--border);
     border-radius: var(--radius);
     font-size: .85rem;
+    overflow: hidden;
 }
 .func-table th {
     background: var(--bg); font-weight: 600; text-align: left;
     padding: .55rem .7rem; white-space: nowrap;
-    border-bottom: 2px solid var(--border);
+    border: 1px solid var(--border);
     font-size: .8rem; color: var(--text-secondary);
 }
 .func-table td {
-    padding: .45rem .7rem; border-bottom: 1px solid var(--border-light);
+    padding: .45rem .7rem; border: 1px solid var(--border);
     vertical-align: top; color: var(--text);
 }
-.func-table tr:last-child td { border-bottom: none; }
 .func-table tbody tr:hover { background: var(--surface-hover); }
 .func-table .func-desc { font-weight: 500; cursor: pointer; }
 .func-table .func-desc:hover { color: var(--primary); }
 
 /* --- DFMEA Table --- */
 .dfmea-table-wrapper {
-    overflow-x: auto;
+    overflow: auto; flex: 1; min-height: 0;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     position: relative;
 }
+.dfmea-table-wrapper::-webkit-scrollbar { width: 10px; height: 10px; }
+.dfmea-table-wrapper::-webkit-scrollbar-track { background: var(--bg); }
+.dfmea-table-wrapper::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 5px; border: 2px solid var(--bg); }
+.dfmea-table-wrapper::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+.dfmea-table-wrapper::-webkit-scrollbar-corner { background: var(--bg); }
+.dfmea-table th { position: relative; }
+.dfmea-table th .col-resize {
+    position: absolute; right: 0; top: 0; bottom: 0;
+    width: 6px; cursor: col-resize;
+    background: transparent;
+    transition: background var(--transition);
+    z-index: 3;
+}
+.dfmea-table th .col-resize:hover,
+.dfmea-table th .col-resize.active {
+    background: var(--primary);
+}
+.dfmea-table.resizing { user-select: none; }
 .dfmea-table {
-    border-collapse: collapse; width: 100%;
+    border-collapse: collapse; min-width: 100%;
     font-size: .81rem;
 }
 .dfmea-table thead {
@@ -813,23 +614,14 @@ h3 { font-size: 1.1rem; font-weight: 600; }
 .dfmea-table th {
     background: var(--bg); font-weight: 600; text-align: left;
     padding: .5rem .55rem; white-space: nowrap;
-    border-bottom: 2px solid var(--border);
+    border: 1px solid var(--border);
     font-size: .78rem; color: var(--text-secondary);
 }
-/* shadow below sticky header when table wrapper scrolls */
-.dfmea-table-wrapper {
-    background:
-        linear-gradient(var(--surface) 30%, transparent),
-        radial-gradient(ellipse at 50% 0%, rgba(0,0,0,.06), transparent 70%);
-    background-repeat: no-repeat;
-    background-size: 100% 40px, 100% 14px;
-    background-attachment: local, scroll;
-}
 .dfmea-table td {
-    padding: .4rem .55rem; border-bottom: 1px solid var(--border-light);
-    vertical-align: top;
-    max-width: 180px; overflow: hidden; text-overflow: ellipsis;
+    padding: .4rem .55rem; border: 1px solid var(--border);
+    vertical-align: top; white-space: normal; word-break: break-word;
 }
+.dfmea-table td.nowrap { white-space: nowrap; }
 .dfmea-table td.editable { cursor: pointer; min-width: 80px; }
 .dfmea-table td.editable:hover { background: var(--primary-light); border-radius: 3px; }
 .dfmea-table tr.row-h { background: var(--rpn-high-bg); }
@@ -957,9 +749,11 @@ h3 { font-size: 1.1rem; font-weight: 600; }
 }
 .chip:hover { border-color: var(--primary); }
 .chip .chip-text {
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    max-width: 260px;
+    white-space: normal; word-break: break-word;
+    max-width: 400px;
 }
+.chip { cursor: pointer; }
+.chip:hover { background: var(--primary-light); border-color: var(--primary); }
 .chip .chip-remove {
     cursor: pointer; color: var(--text-muted);
     font-weight: 700; font-size: .85rem;

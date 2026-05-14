@@ -134,20 +134,14 @@ function openModal(title, contentHtml, onSave) {
     overlay.querySelector('.modal-save').onclick = () => {
         if (onSave(overlay) !== false) overlay.remove();
     };
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     return overlay;
 }
 
 // --- 主题系统: 8 套配色 × 亮/暗/自动 ---
 const COLOR_THEMES = [
-    { id: 'teal',    name: '青绿', color: '#0d9488' },
-    { id: 'blue',    name: '深蓝', color: '#2563eb' },
-    { id: 'indigo',  name: '靛紫', color: '#6366f1' },
-    { id: 'emerald', name: '墨绿', color: '#059669' },
-    { id: 'slate',   name: '灰蓝', color: '#4b6584' },
-    { id: 'amber',   name: '琥珀', color: '#d97706' },
-    { id: 'rose',    name: '玫红', color: '#e11d48' },
-    { id: 'violet',  name: '紫罗兰', color: '#7c3aed' },
+    { id: 'slate', name: '灰蓝', color: '#4b6584' },
+    { id: 'latte', name: '拿铁', color: '#8b6914' },
+    { id: 'steel', name: '钢青', color: '#2c6280' },
 ];
 
 (function initTheme() {
@@ -217,10 +211,14 @@ function openThemePalette(event) {
 
     document.body.appendChild(popover);
 
-    // position near the button
+    // position: below button, left-aligned, clamp to viewport
     const rect = event.target.getBoundingClientRect();
+    const popW = 250; // approximate popover width
+    let left = rect.left;
+    if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+    if (left < 8) left = 8;
     popover.style.top = (rect.bottom + 6) + 'px';
-    popover.style.right = (window.innerWidth - rect.right) + 'px';
+    popover.style.left = left + 'px';
 
     // close on outside click
     const close = (e) => {
@@ -249,5 +247,44 @@ function confirmDlg(message) {
         document.body.appendChild(overlay);
         overlay.querySelector('.modal-cancel').onclick = () => { overlay.remove(); resolve(false); };
         overlay.querySelector('.modal-confirm').onclick = () => { overlay.remove(); resolve(true); };
+    });
+}
+
+// --- Column resize ---
+function initColumnResize(table) {
+    if (!table || table.dataset.resizeReady) return;
+    table.dataset.resizeReady = '1';
+
+    const ths = table.querySelectorAll('th');
+    ths.forEach(th => {
+        const handle = document.createElement('div');
+        handle.className = 'col-resize';
+        th.appendChild(handle);
+
+        let startX, startW, col;
+
+        handle.addEventListener('mousedown', e => {
+            e.preventDefault();
+            col = th;
+            startX = e.clientX;
+            startW = col.offsetWidth;
+            handle.classList.add('active');
+            table.classList.add('resizing');
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        function onMove(e) {
+            const w = Math.max(40, startW + (e.clientX - startX));
+            col.style.width = w + 'px';
+            col.style.minWidth = w + 'px';
+        }
+
+        function onUp() {
+            handle.classList.remove('active');
+            table.classList.remove('resizing');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
     });
 }
