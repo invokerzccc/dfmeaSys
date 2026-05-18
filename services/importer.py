@@ -96,18 +96,20 @@ def import_json(json_str: str, project_name: str = None):
 
 
 # ── Excel 导入 ──
-EXCEL_HEADER_MAP = {
+# 表头关键词 → 字段名，支持换行变体（如 "严重度\nS" 或 "严重度S"）
+EXCEL_HEADER_KEYWORDS = {
     "功能描述": "function_desc",
     "失效模式": "mode_desc",
-    "失效影响(对当前元素)": "local_effect",
-    "失效影响(对系统/整机)": "potential_effect",
-    "严重度S": "severity_S",
+    "失效影响": "potential_effect",  # 优先匹配更具体的
+    "对当前元素": "local_effect",
+    "对系统": "potential_effect",
+    "严重度": "severity_S",
     "特殊特性": "classification",
     "失效原因": "potential_cause",
-    "频度O": "occurrence_O",
+    "频度": "occurrence_O",
     "预防控制": "prevention_control",
     "探测控制": "detection_control",
-    "探测度D": "detection_D",
+    "探测度": "detection_D",
     "建议措施": "recommended_action",
     "责任人": "action_owner",
     "期限": "action_due_date",
@@ -125,14 +127,16 @@ def import_xlsx(file_bytes: bytes, project_id: int):
     wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
     ws = wb.active
 
-    # 找表头行
+    # 找表头行 — 匹配包含关键词的列标题
     header_row = None
     headers = {}
     for row in ws.iter_rows(min_row=1, max_row=min(10, ws.max_row), values_only=False):
         for cell in row:
-            if cell.value and str(cell.value).strip() in EXCEL_HEADER_MAP:
-                header_row = cell.row
-                break
+            sval = str(cell.value).replace("\n", "").strip() if cell.value else ""
+            for kw, field in EXCEL_HEADER_KEYWORDS.items():
+                if kw in sval:
+                    header_row = cell.row
+                    break
         if header_row:
             break
 
@@ -141,9 +145,17 @@ def import_xlsx(file_bytes: bytes, project_id: int):
 
     # 解析表头列映射
     for cell in ws[header_row]:
-        val = str(cell.value).strip() if cell.value else ""
-        if val in EXCEL_HEADER_MAP:
-            headers[EXCEL_HEADER_MAP[val]] = cell.column
+        sval = str(cell.value).replace("\n", "").strip() if cell.value else ""
+        # 特殊处理：失效影响有当前元素和系统两种
+        if "失效影响" in sval and "当前" in sval:
+            headers["local_effect"] = cell.column
+        elif "失效影响" in sval and ("系统" in sval or "整机" in sval):
+            headers["potential_effect"] = cell.column
+        else:
+            for kw, field in EXCEL_HEADER_KEYWORDS.items():
+                if kw in sval and field not in headers:
+                    headers[field] = cell.column
+                    break
 
     if "function_desc" not in headers:
         raise ValueError("未找到'功能描述'列")

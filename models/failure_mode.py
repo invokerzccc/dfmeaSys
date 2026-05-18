@@ -4,6 +4,24 @@ from db.database import get_db
 from services.dfmea_calc import calc_rpn, calc_ap
 
 
+def list_all_failures_flat(project_id: int):
+    """列出项目下所有失效模式（扁平列表，用于关联选择）"""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT fm.id, fm.mode_desc, fi.function_desc, sn.name as node_name, sn.id as node_id
+               FROM failure_mode fm
+               JOIN function_item fi ON fm.function_item_id = fi.id
+               JOIN structure_node sn ON fi.node_id = sn.id
+               WHERE sn.project_id = ?
+               ORDER BY sn.id, fi.id, fm.id""",
+            (project_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
 def list_failures(node_id: int):
     """列出某节点下所有失效模式（关联功能项），含关联的参考资料"""
     conn = get_db()

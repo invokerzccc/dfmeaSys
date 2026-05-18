@@ -3,35 +3,71 @@
 <div id="app" class="app-layout">
     <header class="app-header">
         <span class="logo">DFMEA</span>
-        <span class="text-muted" style="font-size:.8rem">个人记录系统</span>
+        <span class="text-muted" style="font-size:.8rem">设计失效模式与影响分析</span>
         <span class="sep"></span>
-        <button class="theme-palette-btn" onclick="openThemePalette(event)" title="切换配色主题"></button>
+        <button class="btn btn-ghost btn-sm" @click="showTrash = !showTrash; if (showTrash) loadTrash()">
+            &#128465; 回收站 [[ trashCount > 0 ? '(' + trashCount + ')' : '' ]]
+        </button>
         <a href="/docs" target="_blank" class="btn btn-ghost btn-sm">API 文档</a>
     </header>
 
     <main class="app-main">
+        <!-- === 回收站 === -->
+        <div v-if="showTrash" style="margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.2rem 1.5rem">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem">
+                <h2 style="flex:1;margin:0">&#128465; 回收站</h2>
+                <button class="btn btn-ghost btn-sm" @click="showTrash = false">收起</button>
+            </div>
+            <div v-if="trash.length === 0" class="text-muted" style="padding:.5rem 0">回收站为空</div>
+            <table v-else class="project-table">
+                <thead><tr>
+                    <th>项目名称</th>
+                    <th style="width:180px">描述</th>
+                    <th style="width:140px">删除时间</th>
+                    <th style="width:140px">操作</th>
+                </tr></thead>
+                <tbody>
+                    <tr v-for="p in trash" :key="p.id">
+                        <td class="col-name">[[ p.name ]]</td>
+                        <td class="text-muted" style="font-size:.8rem">[[ (p.description || '暂无描述').substring(0, 30) ]]</td>
+                        <td style="font-size:.78rem;color:var(--text-muted)">[[ formatDate(p.updated_at) ]]</td>
+                        <td>
+                            <button class="btn btn-ghost btn-sm" @click="restoreProject(p)">&#8634; 恢复</button>
+                            <button class="btn btn-ghost btn-sm" @click="permanentDelete(p)" style="color:var(--danger)">永久删除</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- === 项目列表 === -->
         <div class="dashboard-header">
             <h1>项目列表</h1>
-            <button class="btn btn-primary" @click="showCreateModal">+ 新建项目</button>
+            <div style="display:flex;gap:.5rem;align-items:center">
+                <button class="btn btn-ghost btn-sm" @click="toggleViewMode" :title="viewMode === 'card' ? '切换到列表' : '切换到卡片'">
+                    [[ viewMode === 'card' ? '&#9776; 列表' : '&#9638; 卡片' ]]
+                </button>
+                <button class="btn btn-primary" @click="showCreateModal">+ 新建项目</button>
+            </div>
         </div>
 
         <div class="mb-2">
-            <input type="text" v-model="search" placeholder="搜索项目..." style="width:280px">
+            <input type="text" v-model="search" placeholder="搜索项目..." style="width:300px">
         </div>
 
-        <div v-if="loading" style="text-align:center;padding:3rem">
-            <div class="spinner" style="margin:0 auto"></div>
-            <p class="text-muted mt-1">加载中...</p>
+        <div v-if="loading" style="padding:2rem 0">
+            <div class="skeleton skeleton-card" v-for="i in 3" :key="i" style="margin-bottom:1rem"></div>
         </div>
 
         <div v-else-if="filteredProjects.length === 0" class="empty-state">
-            <div class="empty-icon">&#x1F4CB;</div>
+            <div class="empty-icon">+</div>
             <p v-if="projects.length === 0">还没有 DFMEA 项目</p>
             <p v-else>没有匹配的项目</p>
             <button class="btn btn-primary mt-2" @click="showCreateModal">创建第一个项目</button>
         </div>
 
-        <div v-else class="project-grid">
+        <!-- 卡片视图 -->
+        <div v-else-if="viewMode === 'card'" class="project-grid">
             <div v-for="p in filteredProjects" :key="p.id" class="project-card">
                 <div class="card-name">[[ p.name ]]</div>
                 <div class="card-desc">[[ p.description || '暂无描述' ]]</div>
@@ -42,10 +78,39 @@
                 </div>
                 <div class="card-actions">
                     <span class="card-date">[[ formatDate(p.updated_at) ]]</span>
-                    <a :href="`/project/${p.id}`" class="btn btn-primary btn-sm">打开</a>
+                    <a :href="'/project/' + p.id" class="btn btn-primary btn-sm">打开</a>
                     <button class="btn btn-ghost btn-sm" @click="removeProject(p)">删除</button>
                 </div>
             </div>
+        </div>
+
+        <!-- 列表视图 -->
+        <div v-else>
+            <table class="project-table">
+                <thead><tr>
+                    <th>项目名称</th>
+                    <th style="width:180px">描述</th>
+                    <th class="col-stat">部件</th>
+                    <th class="col-stat">功能项</th>
+                    <th class="col-stat">高风险</th>
+                    <th style="width:140px">更新时间</th>
+                    <th style="width:110px">操作</th>
+                </tr></thead>
+                <tbody>
+                    <tr v-for="p in filteredProjects" :key="p.id" @dblclick="openProject(p)">
+                        <td class="col-name">[[ p.name ]]</td>
+                        <td class="text-muted" style="font-size:.8rem">[[ (p.description || '暂无描述').substring(0, 30) ]]</td>
+                        <td class="col-stat">[[ p.node_count ]]</td>
+                        <td class="col-stat">[[ p.function_count ]]</td>
+                        <td class="col-stat"><span :class="p.high_risk_count > 0 ? 'text-danger' : ''" style="font-weight:600">[[ p.high_risk_count ]]</span></td>
+                        <td style="font-size:.78rem;color:var(--text-muted)">[[ formatDate(p.updated_at) ]]</td>
+                        <td>
+                            <a :href="'/project/' + p.id" class="btn btn-primary btn-sm">打开</a>
+                            <button class="btn btn-ghost btn-sm" @click.stop="removeProject(p)" style="color:var(--danger)">&#10005;</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </main>
 
@@ -78,67 +143,96 @@
 
 {% block scripts %}
 <script>
-const { createApp, ref, computed, onMounted } = Vue;
+var { createApp, ref, computed, onMounted } = Vue;
 
 createApp({
     delimiters: ['[[', ']]'],
-    setup() {
-        const projects = ref([]);
-        const loading = ref(true);
-        const search = ref('');
-        const showModal = ref(false);
-        const form = ref({ name: '', description: '', template_id: null });
+    setup: function () {
+        var projects = ref([]);
+        var loading = ref(true);
+        var search = ref('');
+        var showModal = ref(false);
+        var viewMode = ref(localStorage.getItem('dfmea-view-mode') || 'card');
+        var form = ref({ name: '', description: '', template_id: null });
+        var showTrash = ref(false);
+        var trash = ref([]);
+        var trashCount = ref(0);
 
-        const filteredProjects = computed(() => {
-            const q = search.value.toLowerCase();
-            return projects.value.filter(p => p.name.toLowerCase().includes(q));
+        var filteredProjects = computed(function () {
+            var q = search.value.toLowerCase();
+            return projects.value.filter(function (p) { return p.name.toLowerCase().includes(q); });
         });
 
-        async function loadProjects() {
+        function loadProjects() {
             loading.value = true;
-            try {
-                projects.value = await API.get('/api/v1/projects');
-            } catch (e) {
-                showToast('加载失败: ' + e.message, 'warning');
-            } finally {
-                loading.value = false;
-            }
+            API.get('/api/v1/projects')
+                .then(function (data) { projects.value = data; })
+                .catch(function (e) { showToast('加载失败: ' + e.message, 'warning'); })
+                .finally(function () { loading.value = false; });
         }
 
-        function showCreateModal() {
+        function loadTrash() {
+            API.get('/api/v1/projects/trash/list')
+                .then(function (data) { trash.value = data; trashCount.value = data.length; })
+                .catch(function () {});
+        }
+
+        function showCreateModalFn() {
             form.value = { name: '', description: '', template_id: null };
             showModal.value = true;
         }
 
-        async function createProject() {
+        function createProject() {
             if (!form.value.name.trim()) return;
-            try {
-                await API.post('/api/v1/projects', form.value);
-                showModal.value = false;
-                showToast('项目已创建', 'success');
-                loadProjects();
-            } catch (e) {
-                showToast('创建失败: ' + e.message, 'warning');
-            }
+            API.post('/api/v1/projects', form.value)
+                .then(function () { showModal.value = false; showToast('项目已创建', 'success'); loadProjects(); })
+                .catch(function (e) { showToast('创建失败: ' + e.message, 'warning'); });
         }
 
-        async function removeProject(p) {
-            if (!await confirmDlg('确认删除项目 "' + p.name + '"？\n删除后可在数据库中恢复。')) return;
-            try {
-                await API.del('/api/v1/projects/' + p.id);
-                showToast('已删除 "' + p.name + '"', 'info');
-                loadProjects();
-            } catch (e) {
-                showToast('删除失败: ' + e.message, 'warning');
-            }
+        function openProject(p) { window.location.href = '/project/' + p.id; }
+
+        function toggleViewMode() {
+            viewMode.value = viewMode.value === 'card' ? 'list' : 'card';
+            localStorage.setItem('dfmea-view-mode', viewMode.value);
         }
 
-        onMounted(loadProjects);
+        function removeProject(p) {
+            confirmDlg('确认删除项目 "' + p.name + '"？\n项目将移入回收站，可在回收站中恢复。').then(function (ok) {
+                if (!ok) return;
+                API.del('/api/v1/projects/' + p.id)
+                    .then(function () { showToast('已移入回收站', 'info'); loadProjects(); loadTrash(); })
+                    .catch(function (e) { showToast('删除失败: ' + e.message, 'warning'); });
+            });
+        }
+
+        function restoreProject(p) {
+            API.post('/api/v1/projects/' + p.id + '/restore')
+                .then(function () { showToast('"' + p.name + '" 已恢复', 'success'); loadProjects(); loadTrash(); })
+                .catch(function (e) { showToast('恢复失败: ' + e.message, 'warning'); });
+        }
+
+        function permanentDelete(p) {
+            confirmDlg('永久删除 "' + p.name + '"？\n此操作不可撤销，所有结构树、功能、失效数据将被彻底删除。').then(function (ok) {
+                if (!ok) return;
+                API.del('/api/v1/projects/' + p.id + '/permanent')
+                    .then(function () { showToast('已永久删除', 'info'); loadTrash(); })
+                    .catch(function (e) { showToast('删除失败: ' + e.message, 'warning'); });
+            });
+        }
+
+        onMounted(function () { loadProjects(); loadTrash(); });
 
         return {
-            projects, loading, search, showModal, form,
-            filteredProjects, showCreateModal, createProject, removeProject,
-            formatDate,
+            projects: projects, loading: loading, search: search,
+            showModal: showModal, viewMode: viewMode, form: form,
+            showTrash: showTrash, trash: trash, trashCount: trashCount,
+            filteredProjects: filteredProjects,
+            showCreateModal: showCreateModalFn,
+            createProject: createProject, removeProject: removeProject,
+            openProject: openProject, toggleViewMode: toggleViewMode,
+            restoreProject: restoreProject, permanentDelete: permanentDelete,
+            loadTrash: loadTrash,
+            formatDate: formatDate,
         };
     }
 }).mount('#app');

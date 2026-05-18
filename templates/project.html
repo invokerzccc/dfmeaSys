@@ -4,7 +4,6 @@
     <header class="app-header">
         <a href="/" class="btn btn-ghost btn-sm">← 返回</a>
         <span class="text-muted" style="font-size:.8rem">[[ project.name ]]</span>
-        <button class="theme-palette-btn" onclick="openThemePalette(event)" title="切换配色主题" style="margin-left:.5rem"></button>
         <span class="sep"></span>
         <nav class="tabs">
             <span class="tab-item" :class="{ active: tab === 'structure' }" @click="tab = 'structure'">结构树</span>
@@ -42,7 +41,7 @@
         <div class="resize-handle" v-if="tab !== 'export'" @mousedown="startResize"></div>
 
         <!-- 主工作区 -->
-        <main class="main-content" @click="hideCtxMenu">
+        <main class="main-content" @click="hideCtxMenu; showColsPopover = false">
             <div v-if="tab === 'structure'">
                 <h2 v-if="activeNode">[[ activeNode.name ]]</h2>
                 <div v-if="activeNode" class="node-edit-form">
@@ -120,55 +119,102 @@
                 <div v-if="activeNode" style="display:flex;flex-direction:column;flex:1;min-height:0">
                     <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
                         <h2 style="flex:1">DFMEA — [[ activeNode.name ]]</h2>
+                        <div class="dfmea-cols-toggle">
+                            <button class="btn btn-ghost btn-sm" @click.stop="showColsPopover = !showColsPopover" title="选择显示列">&#9776; 列</button>
+                            <div class="dfmea-cols-popover" v-if="showColsPopover" @click.stop>
+                                <div class="cols-group-label">核心分析</div>
+                                <label><input type="checkbox" v-model="dfmeaCol.func" @change="saveColsPref"> 功能</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.mode" @change="saveColsPref"> 失效模式</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.localEffect" @change="saveColsPref"> 失效影响（对当前元素）</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.potentialEffect" @change="saveColsPref"> 失效影响（对系统/整机）</label>
+                                <div class="cols-group-label">原因 & 控制</div>
+                                <label><input type="checkbox" v-model="dfmeaCol.cause" @change="saveColsPref"> 失效原因</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.prevent" @change="saveColsPref"> 预防控制</label>
+                                <div class="cols-group-label">探测控制</div>
+                                <label><input type="checkbox" v-model="dfmeaCol.detectDes" @change="saveColsPref"> 　设计</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.detectPrc" @change="saveColsPref"> 　制程</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.detectVer" @change="saveColsPref"> 　验证</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.detectOps" @change="saveColsPref"> 　运维</label>
+                                <div class="cols-group-label">评分</div>
+                                <label><input type="checkbox" v-model="dfmeaCol.S" @change="saveColsPref"> S — 严重度</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.O" @change="saveColsPref"> O — 频度</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.D" @change="saveColsPref"> D — 探测度</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.class" @change="saveColsPref"> 分类 (SC/CC)</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.RPN" @change="saveColsPref"> RPN</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.AP" @change="saveColsPref"> AP</label>
+                                <div class="cols-group-label">改进 & 管理</div>
+                                <label><input type="checkbox" v-model="dfmeaCol.action" @change="saveColsPref"> 建议措施</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.status" @change="saveColsPref"> 状态</label>
+                                <label><input type="checkbox" v-model="dfmeaCol.refs" @change="saveColsPref"> 参考资料</label>
+                            </div>
+                        </div>
                         <button class="btn btn-primary btn-sm" @click="openDfmeaAdd">+ 添加失效行</button>
+                        <span style="color:var(--border);margin:0 .1rem;user-select:none">|</span>
+                        <button class="btn btn-ghost btn-sm dfmea-font-btn" @click="adjFontSize(-1)" title="缩小字体" :disabled="dfmeaFontSize <= 0">A-</button>
+                        <button class="btn btn-ghost btn-sm dfmea-font-btn" @click="adjFontSize(1)" title="放大字体" :disabled="dfmeaFontSize >= 2">A+</button>
                     </div>
 
-                    <div class="dfmea-table-wrapper" v-if="failures.length > 0">
-                        <table class="dfmea-table">
-                            <thead>
-                                <tr>
-                                    <th style="width:32px">#</th><th style="min-width:90px">功能</th><th style="min-width:100px">失效模式</th><th style="min-width:160px">失效影响</th>
-                                    <th style="width:48px">S</th><th style="width:48px">分类</th>
-                                    <th style="min-width:160px">失效原因</th><th style="width:48px">O</th>
-                                    <th style="min-width:160px">预防控制</th><th style="min-width:160px">探测控制</th><th style="width:48px">D</th>
-                                    <th style="width:60px">RPN</th><th style="width:44px">AP</th>
-                                    <th style="min-width:140px">建议措施</th><th style="width:55px">参考</th><th style="width:60px">状态</th>
-                                    <th style="width:55px">操作</th>
-                                </tr>
-                            </thead>
+                    <div class="dfmea-table-wrapper" v-if="failures.length > 0" ref="dfmeaWrapper">
+                        <table class="dfmea-table" ref="dfmeaTable" :style="{ fontSize: dfmeaFontSizes[dfmeaFontSize] }">
+                            <thead><tr>
+                                <th style="width:32px" v-show="dfmeaCol.seq">#</th>
+                                <th style="min-width:110px" v-show="dfmeaCol.func" class="bg-core">功能</th>
+                                <th style="min-width:130px" v-show="dfmeaCol.mode" class="bg-core">失效模式</th>
+                                <th style="min-width:340px" v-show="dfmeaCol.localEffect" class="bg-core">失效影响<br>对当前</th>
+                                <th style="min-width:340px" v-show="dfmeaCol.potentialEffect" class="bg-core">失效影响<br>对系统/整机</th>
+                                <th style="min-width:340px" v-show="dfmeaCol.cause" class="group-start bg-cause">失效原因</th>
+                                <th style="min-width:340px" v-show="dfmeaCol.prevent" class="bg-cause">预防控制</th>
+                                <th style="min-width:340px" v-show="dfmeaCol.detectDes" class="group-start col-detect-d">探测控制<br>设计</th>
+                                <th style="min-width:340px" v-show="dfmeaCol.detectPrc" class="col-detect-p">探测控制<br>制程</th>
+                                <th style="min-width:340px" v-show="dfmeaCol.detectVer" class="col-detect-v">探测控制<br>验证</th>
+                                <th style="min-width:340px" v-show="dfmeaCol.detectOps" class="col-detect-o">探测控制<br>运维</th>
+                                <th style="width:44px" v-show="dfmeaCol.S" class="group-start col-score bg-score">S</th>
+                                <th style="width:44px" v-show="dfmeaCol.O" class="col-score bg-score">O</th>
+                                <th style="width:44px" v-show="dfmeaCol.D" class="col-score bg-score">D</th>
+                                <th style="width:50px" v-show="dfmeaCol.class" class="bg-score">分类</th>
+                                <th style="width:60px" v-show="dfmeaCol.RPN" class="col-score bg-score">RPN</th>
+                                <th style="width:44px" v-show="dfmeaCol.AP" class="col-score bg-score">AP</th>
+                                <th style="min-width:340px" v-show="dfmeaCol.action" class="group-start bg-action">建议措施</th>
+                                <th style="width:55px" v-show="dfmeaCol.refs" class="bg-action">参考</th>
+                                <th style="width:60px" v-show="dfmeaCol.status" class="bg-action">状态</th>
+                                <th style="width:55px">操作</th>
+                            </tr></thead>
                             <tbody>
                                 <tr v-for="(f, idx) in failures" :key="f.id"
                                     :class="{ 'row-h': f.rpn >= 200, 'row-m': f.rpn >= 100 && f.rpn < 200 }">
-                                    <td class="nowrap">[[ idx + 1 ]]</td>
-                                    <td class="nowrap" :title="f.function_desc">[[ truncate(f.function_desc, 18) ]]</td>
-                                    <td :title="f.mode_desc" @dblclick="editDfmea(f)">[[ truncate(f.mode_desc, 22) ]]</td>
-                                    <td :title="f.potential_effect"><div v-for="(line, i) in f.potential_effect.split('\n')" :key="'e'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
-                                    <td class="nowrap" style="text-align:center"><span class="score-dot" :class="'score-' + (f.severity_S >= 7 ? 'h' : f.severity_S >= 4 ? 'm' : 'l')">[[ f.severity_S ]]</span></td>
-                                    <td class="nowrap">[[ f.classification || '-' ]]</td>
-                                    <td :title="f.potential_cause"><div v-for="(line, i) in f.potential_cause.split('\n')" :key="'c'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
-                                    <td class="nowrap" style="text-align:center"><span class="score-dot" :class="'score-' + (f.occurrence_O >= 7 ? 'h' : f.occurrence_O >= 4 ? 'm' : 'l')">[[ f.occurrence_O ]]</span></td>
-                                    <td :title="f.prevention_control"><div v-for="(line, i) in f.prevention_control.split('\n')" :key="'p'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
-                                    <td :title="f.detection_control"><div v-for="(line, i) in f.detection_control.split('\n')" :key="'d'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
-                                    <td class="nowrap" style="text-align:center"><span class="score-dot" :class="'score-' + (f.detection_D >= 7 ? 'h' : f.detection_D >= 4 ? 'm' : 'l')">[[ f.detection_D ]]</span></td>
-                                    <td class="nowrap"><span class="tag" :class="'tag-' + rpnLevel(f.rpn).toLowerCase()" style="font-weight:700">[[ f.rpn ]]</span></td>
-                                    <td class="nowrap"><span class="tag" :class="'tag-' + f.action_priority.toLowerCase()">[[ f.action_priority ]]</span></td>
-                                    <td :title="f.recommended_action"><div v-for="(line, i) in f.recommended_action.split('\n')" :key="'r'+i" v-show="line.trim()" style="margin-bottom:2px">[[ line ]]</div></td>
-                                    <td class="nowrap" style="text-align:center">
-                                        <span v-if="f.linked_refs && f.linked_refs.length > 0"
-                                            class="tag" style="font-size:.7rem;cursor:pointer;background:var(--primary);color:#fff"
-                                            :title="f.linked_refs.map(r => r.title).join('\n')">
-                                            📎 [[ f.linked_refs.length ]]
-                                        </span>
+                                    <td class="nowrap" v-show="dfmeaCol.seq">[[ idx + 1 ]]</td>
+                                    <td class="nowrap" :title="f.function_desc" v-show="dfmeaCol.func" class="bg-core">[[ truncate(f.function_desc, 18) ]]</td>
+                                    <td :title="f.mode_desc" @dblclick="editDfmea(f)" v-show="dfmeaCol.mode" class="bg-core">[[ truncate(f.mode_desc, 22) ]]</td>
+                                    <td :title="f.local_effect" @dblclick="editDfmea(f)" v-show="dfmeaCol.localEffect" class="bg-core"><div v-for="(line, i) in (f.local_effect || '').split('\n')" :key="'le'+i" v-show="line.trim()" class="dfmea-item">— [[ line ]]</div></td>
+                                    <td :title="f.potential_effect" @dblclick="editDfmea(f)" v-show="dfmeaCol.potentialEffect" class="bg-core"><div v-for="(line, i) in (f.potential_effect || '').split('\n')" :key="'pe'+i" v-show="line.trim()" class="dfmea-item">— [[ line ]]</div></td>
+                                    <td :title="f.potential_cause" v-show="dfmeaCol.cause" class="group-start bg-cause"><div v-for="(line, i) in (f.potential_cause || '').split('\n')" :key="'c'+i" v-show="line.trim()" class="dfmea-item">— [[ line ]]</div></td>
+                                    <td :title="f.prevention_control" v-show="dfmeaCol.prevent" class="bg-cause"><div v-for="(line, i) in (f.prevention_control || '').split('\n')" :key="'p'+i" v-show="line.trim()" class="dfmea-item">— [[ line ]]</div></td>
+                                    <td :title="detectParsed(f).design" v-show="dfmeaCol.detectDes" class="group-start col-detect-d"><div v-if="detectParsed(f).design" v-for="(line, i) in (detectParsed(f).design || '').split('\n')" :key="'dd'+i" v-show="line.trim()" class="dfmea-item">— [[ line ]]</div></td>
+                                    <td :title="detectParsed(f).process" v-show="dfmeaCol.detectPrc" class="col-detect-p"><div v-if="detectParsed(f).process" v-for="(line, i) in (detectParsed(f).process || '').split('\n')" :key="'dp'+i" v-show="line.trim()" class="dfmea-item">— [[ line ]]</div></td>
+                                    <td :title="detectParsed(f).verify" v-show="dfmeaCol.detectVer" class="col-detect-v"><div v-if="detectParsed(f).verify" v-for="(line, i) in (detectParsed(f).verify || '').split('\n')" :key="'dv'+i" v-show="line.trim()" class="dfmea-item">— [[ line ]]</div></td>
+                                    <td :title="detectParsed(f).ops" v-show="dfmeaCol.detectOps" class="col-detect-o"><div v-if="detectParsed(f).ops" v-for="(line, i) in (detectParsed(f).ops || '').split('\n')" :key="'do'+i" v-show="line.trim()" class="dfmea-item">— [[ line ]]</div></td>
+                                    <td class="nowrap col-score group-start bg-score" style="text-align:center" v-show="dfmeaCol.S"><span class="score-dot" :class="'score-' + (f.severity_S >= 7 ? 'h' : f.severity_S >= 4 ? 'm' : 'l')">[[ f.severity_S ]]</span></td>
+                                    <td class="nowrap col-score bg-score" style="text-align:center" v-show="dfmeaCol.O"><span class="score-dot" :class="'score-' + (f.occurrence_O >= 7 ? 'h' : f.occurrence_O >= 4 ? 'm' : 'l')">[[ f.occurrence_O ]]</span></td>
+                                    <td class="nowrap col-score bg-score" style="text-align:center" v-show="dfmeaCol.D"><span class="score-dot" :class="'score-' + (f.detection_D >= 7 ? 'h' : f.detection_D >= 4 ? 'm' : 'l')">[[ f.detection_D ]]</span></td>
+                                    <td class="nowrap bg-score" v-show="dfmeaCol.class">[[ f.classification || '-' ]]</td>
+                                    <td class="nowrap col-score bg-score" v-show="dfmeaCol.RPN"><span class="tag" :class="'tag-' + rpnLevel(f.rpn).toLowerCase()" style="font-weight:700">[[ f.rpn ]]</span></td>
+                                    <td class="nowrap col-score bg-score" v-show="dfmeaCol.AP"><span class="tag" :class="'tag-' + f.action_priority.toLowerCase()">[[ f.action_priority ]]</span></td>
+                                    <td :title="f.recommended_action" v-show="dfmeaCol.action" class="group-start bg-action"><div v-for="(line, i) in (f.recommended_action || '').split('\n')" :key="'r'+i" v-show="line.trim()" class="dfmea-item">— [[ line ]]</div></td>
+                                    <td class="nowrap bg-action" style="text-align:center" v-show="dfmeaCol.refs">
+                                        <span v-if="f.linked_refs && f.linked_refs.length > 0" class="tag" style="font-size:.7rem;cursor:pointer;background:var(--accent);color:#fff" :title="f.linked_refs.map(function(r){return r.title}).join('\n')">[[ f.linked_refs.length ]]</span>
                                         <span v-else style="color:var(--text-secondary);font-size:.75rem">-</span>
                                     </td>
-                                    <td class="nowrap">[[ f.action_status || '-' ]]</td>
+                                    <td class="nowrap bg-action" v-show="dfmeaCol.status">[[ f.action_status || '-' ]]</td>
                                     <td class="nowrap">
-                                        <button class="btn btn-ghost btn-sm" @click="editDfmea(f)" title="编辑">✎</button>
-                                        <button class="btn btn-ghost btn-sm" @click="deleteDfmea(f)" title="删除" style="color:var(--danger)">✕</button>
+                                        <button class="btn btn-ghost btn-sm" @click="editDfmea(f)" title="编辑">&#9998;</button>
+                                        <button class="btn btn-ghost btn-sm" @click="deleteDfmea(f)" title="删除" style="color:var(--danger)">&#10005;</button>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    <div class="dfmea-scrollbar-gutter" v-if="failures.length > 0" ref="dfmeaScrollGutter">
+                        <div class="dfmea-scrollbar-gutter-inner" ref="dfmeaScrollGutterInner"></div>
                     </div>
                     <div v-else class="empty-state" style="padding:3rem">
                         <p>该节点暂无失效分析数据</p>
@@ -272,8 +318,8 @@
     <div v-if="ctxMenu.show" class="ctx-backdrop" @click="hideCtxMenu"></div>
 
     <!-- 功能项编辑模态框 -->
-    <div v-if="showFuncModal" class="modal-overlay">
-        <div class="modal" style="max-width:760px;min-width:560px">
+    <div v-if="showFuncModal" class="modal-overlay" @click.self="showFuncModal=false">
+        <div class="modal" ref="funcModalEl" style="max-width:760px;min-width:560px;position:relative" @click.stop>
             <h2>[[ editingFunc ? '编辑功能' : '添加功能' ]]</h2>
             <div class="form-group">
                 <label>功能描述 <span style="color:var(--danger)">*</span></label>
@@ -299,8 +345,8 @@
     </div>
 
     <!-- 批量导入模态框 -->
-    <div v-if="showBatchModal" class="modal-overlay">
-        <div class="modal">
+    <div v-if="showBatchModal" class="modal-overlay" @click.self="showBatchModal=false">
+        <div class="modal" ref="batchModalEl" style="position:relative" @click.stop>
             <h2>批量导入功能项</h2>
             <p class="text-muted mb-1" style="font-size:.85rem">每行输入一个功能描述，将自动创建多条功能项</p>
             <div class="form-group">
@@ -314,8 +360,8 @@
     </div>
 
     <!-- DFMEA 编辑模态框 -->
-    <div v-if="showDfmeaModal" class="modal-overlay">
-        <div class="modal" style="max-width:1060px;min-width:860px;padding:0;overflow:hidden">
+    <div v-if="showDfmeaModal" class="modal-overlay" @click.self="showDfmeaModal=false">
+        <div class="modal" ref="dfmeaModalEl" style="max-width:1060px;min-width:860px;padding:0;overflow:hidden;position:relative" @click.stop>
             <!-- Header -->
             <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem">
                 <h2 style="margin:0;flex:1">[[ editingDfmea ? '编辑失效模式' : '添加失效模式' ]]</h2>
@@ -417,7 +463,7 @@
                         <div class="chip-add-row">
                             <select v-model="newDetectCat" style="flex:0 0 110px;font-size:.8rem;padding:.3rem .35rem">
                                 <option value="">— 阶段 —</option>
-                                <option>设计分析</option><option>验证测试</option><option>过程检测</option><option>下线检测</option>
+                                <option>设计</option><option>制程</option><option>验证</option><option>运维</option>
                             </select>
                             <input v-model="newDetection" placeholder="具体探测方法..."
                                 @keyup.enter="if(newDetection.trim()){ const prefix = newDetectCat ? '['+newDetectCat+'] ' : ''; dfmeaItems.detection_control.push(prefix + newDetection.trim()); newDetection=''; newDetectCat=''; onDfmeaItemChange(); }">
@@ -785,14 +831,103 @@ createApp({
         // 功能分析状态
         const functions = ref([]);
         const showFuncModal = ref(false);
+        const funcModalEl = ref(null);
         const showBatchModal = ref(false);
+        const batchModalEl = ref(null);
         const editingFunc = ref(null);
         const funcForm = reactive({ function_desc: '', requirement: '', performance_spec: '', interface_desc: '' });
         const batchText = ref('');
 
         // DFMEA 状态
         const failures = ref([]);
+        const showColsPopover = ref(false);
+        const dfmeaCol = reactive(loadColsPref());
+        function loadColsPref() {
+            try { const saved = JSON.parse(localStorage.getItem('dfmea-cols') || 'null'); if (saved) return saved; } catch(e) {}
+            return { seq: false, func: true, mode: true, localEffect: false, potentialEffect: true, S: false, O: false, D: false, RPN: true, AP: true, class: false, cause: true, prevent: true, detectDes: true, detectPrc: true, detectVer: true, detectOps: true, action: true, refs: false, status: true };
+        }
+        function saveColsPref() { localStorage.setItem('dfmea-cols', JSON.stringify(dfmeaCol)); }
+        const dfmeaFontSize = ref(parseInt(localStorage.getItem('dfmea-font-size') || '1'));
+        const dfmeaFontSizes = ['.76rem', '.82rem', '.90rem'];
+        function adjFontSize(delta) { const v = Math.max(0, Math.min(2, dfmeaFontSize.value + delta)); dfmeaFontSize.value = v; localStorage.setItem('dfmea-font-size', v); }
+        const dfmeaWrapper = ref(null);
+        const dfmeaTable = ref(null);
+        const dfmeaScrollGutter = ref(null);
+        const dfmeaScrollGutterInner = ref(null);
+        function parseDetectionControl(dc) {
+            const result = { design: '', process: '', verify: '', ops: '' };
+            if (!dc) return result;
+            const stageMap = { '设计': 'design', '制程': 'process', '验证': 'verify', '运维': 'ops', '来料检验': 'process', '产线检测': 'process', '系统监控': 'ops' };
+            const lines = dc.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const m = line.match(/^\[(.+?)\]\s?(.*)/);
+                if (m) {
+                    const col = stageMap[m[1]] || 'process';
+                    const content = (m[2] || '').trim();
+                    if (content) result[col] += (result[col] ? '\n' : '') + content;
+                } else {
+                    result.process += (result.process ? '\n' : '') + line;
+                }
+            }
+            return result;
+        }
+        function detectParsed(f) {
+            if (!f._dp) f._dp = parseDetectionControl(f.detection_control);
+            return f._dp;
+        }
+        let dfmeaResizeObserver = null;
+        function syncDfmeaScrollbar() {
+            const wrapper = dfmeaWrapper.value;
+            const gutter = dfmeaScrollGutter.value;
+            const inner = dfmeaScrollGutterInner.value;
+            const table = dfmeaTable.value;
+            if (!wrapper || !gutter || !inner || !table) return;
+            const updateWidth = () => { inner.style.width = table.scrollWidth + 'px'; };
+            updateWidth();
+            if (dfmeaResizeObserver) dfmeaResizeObserver.disconnect();
+            dfmeaResizeObserver = new ResizeObserver(() => { updateWidth(); });
+            dfmeaResizeObserver.observe(table);
+            let syncing = false;
+            wrapper.addEventListener('scroll', () => { if (syncing) return; syncing = true; gutter.scrollLeft = wrapper.scrollLeft; syncing = false; });
+            gutter.addEventListener('scroll', () => { if (syncing) return; syncing = true; wrapper.scrollLeft = gutter.scrollLeft; syncing = false; });
+        }
+        function initColumnResize(table) {
+            const ths = table.querySelectorAll('th');
+            ths.forEach(th => {
+                const handle = document.createElement('div');
+                handle.className = 'col-resize';
+                th.appendChild(handle);
+                let startX, startW;
+                handle.addEventListener('mousedown', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startX = e.clientX;
+                    startW = th.offsetWidth;
+                    handle.classList.add('active');
+                    table.classList.add('resizing');
+                    const onMove = ev => {
+                        const w = Math.max(40, startW + ev.clientX - startX);
+                        th.style.width = w + 'px'; th.style.minWidth = w + 'px';
+                    };
+                    const onUp = () => {
+                        handle.classList.remove('active');
+                        table.classList.remove('resizing');
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    };
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                });
+            });
+        }
         const showDfmeaModal = ref(false);
+        const dfmeaModalEl = ref(null);
+        // Modal 缩放
+        watch(showFuncModal, (val) => { if (val) Vue.nextTick(() => { if (funcModalEl.value) initModalResize(funcModalEl.value); }); });
+        watch(showDfmeaModal, (val) => { if (val) Vue.nextTick(() => { if (dfmeaModalEl.value) initModalResize(dfmeaModalEl.value); }); });
+        watch(showBatchModal, (val) => { if (val) Vue.nextTick(() => { if (batchModalEl.value) initModalResize(batchModalEl.value); }); });
         const editingDfmea = ref(null);
         const dfmeaForm = reactive({
             function_item_id: 0, mode_desc: '', potential_effect: '',
@@ -1156,7 +1291,7 @@ createApp({
             loadAllFailuresForFill();
             Vue.nextTick(() => {
                 const table = document.querySelector('.dfmea-table');
-                if (table) initColumnResize(table);
+                if (table) { initColumnResize(table); syncDfmeaScrollbar(); }
             });
         }
 
@@ -1518,10 +1653,14 @@ createApp({
             doAddChild, doRename, doMoveUp, doMoveDown, doDelete,
             onDragBegin, onDragOver, onDragLeave, onDropped, onDragEnd,
             // 功能分析
-            functions, showFuncModal, showBatchModal, editingFunc, funcForm, batchText,
+            functions, showFuncModal, showBatchModal, funcModalEl, batchModalEl, editingFunc, funcForm, batchText,
             openAddFunc, editFunc, saveFunc, deleteFunc, openBatchFunc, saveBatch,
             // DFMEA
-            failures, showDfmeaModal, editingDfmea, dfmeaForm, dfmeaItems,
+            failures, showColsPopover, dfmeaCol, saveColsPref,
+            dfmeaFontSize, dfmeaFontSizes, adjFontSize,
+            dfmeaWrapper, dfmeaTable, dfmeaScrollGutter, dfmeaScrollGutterInner,
+            detectParsed,
+            showDfmeaModal, dfmeaModalEl, editingDfmea, dfmeaForm, dfmeaItems,
             functionsForDfmea, allFailuresForFill, projectReferences, dfmeaSelectedRefIds, refSearchText, filteredRefs, getRefTitle,
             openDfmeaAdd, editDfmea, saveDfmea, deleteDfmea, truncate,
             quickFillDfmea, onDfmeaItemChange, getDetectCat, setDetectCat,

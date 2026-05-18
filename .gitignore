@@ -12,6 +12,9 @@ venv/
 # Claude
 .claude/
 
+# Deprecated docs
+systemDesc/
+
 # Database & uploads (local data, not code)
 dfmea.db
 uploads/

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import io
+from urllib.parse import quote
 
 from services import export as export_svc
 from services import importer as import_svc
@@ -34,11 +35,13 @@ def export_xlsx(project_id: int):
     try:
         data = export_svc.export_xlsx(project_id)
         proj = get_db().execute("SELECT name FROM project WHERE id = ?", (project_id,)).fetchone()
-        filename = f"DFMEA_{proj['name']}.xlsx" if proj else f"DFMEA_project_{project_id}.xlsx"
+        safe_name = proj['name'] if proj else f"project_{project_id}"
+        fname = f"DFMEA_{safe_name}.xlsx"
+        encoded = quote(fname, safe='')
         return StreamingResponse(
             io.BytesIO(data),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

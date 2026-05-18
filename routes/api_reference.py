@@ -2,6 +2,7 @@
 
 import os
 import uuid
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
@@ -16,7 +17,8 @@ router = APIRouter(prefix="/api/v1")
 class ReferenceCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     type: str = "其他"
-    node_id: int | None = None
+    node_ids: list[int] = []
+    failure_mode_ids: list[int] = []
     url: str = ""
     notes: str = ""
 
@@ -24,7 +26,8 @@ class ReferenceCreate(BaseModel):
 class ReferenceUpdate(BaseModel):
     title: str | None = None
     type: str | None = None
-    node_id: int | None = None
+    node_ids: list[int] | None = None
+    failure_mode_ids: list[int] | None = None
     url: str | None = None
     notes: str | None = None
 
@@ -48,7 +51,8 @@ def create_reference(project_id: int, body: ReferenceCreate):
         project_id=project_id,
         title=body.title,
         type=body.type,
-        node_id=body.node_id,
+        node_ids=body.node_ids,
+        failure_mode_ids=body.failure_mode_ids,
         url=body.url,
         notes=body.notes,
     )
@@ -59,12 +63,12 @@ async def upload_reference(
     project_id: int,
     title: str = Form(...),
     type: str = Form("其他"),
-    node_id: int = Form(None),
+    node_ids: str = Form("[]"),
+    failure_mode_ids: str = Form("[]"),
     notes: str = Form(""),
     file: UploadFile = File(...),
 ):
     """上传文件作为参考材料"""
-    # 保存文件
     ext = Path(file.filename).suffix if file.filename else ""
     safe_name = f"{uuid.uuid4().hex}{ext}"
     project_dir = Path(config.UPLOAD_DIR) / str(project_id)
@@ -76,11 +80,14 @@ async def upload_reference(
         f.write(content)
 
     rel_path = f"{project_id}/{safe_name}"
+    ids = json.loads(node_ids) if node_ids else []
+    fm_ids = json.loads(failure_mode_ids) if failure_mode_ids else []
     return ref_model.create_reference(
         project_id=project_id,
         title=title,
         type=type,
-        node_id=node_id,
+        node_ids=ids,
+        failure_mode_ids=fm_ids,
         file_path=rel_path,
         notes=notes,
     )
