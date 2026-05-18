@@ -91,13 +91,13 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(f, idx) in functions" :key="f.id">
+                            <tr v-for="(f, idx) in functions" :key="f.id" @dblclick="editFunc(f)">
                                 <td>[[ idx + 1 ]]</td>
-                                <td class="func-desc" @dblclick="editFunc(f)">[[ f.function_desc ]]</td>
+                                <td class="func-desc">[[ f.function_desc ]]</td>
                                 <td>[[ f.requirement || '-' ]]</td>
                                 <td>[[ f.performance_spec || '-' ]]</td>
                                 <td>[[ f.interface_desc || '-' ]]</td>
-                                <td>
+                                <td @dblclick.stop>
                                     <button class="btn btn-ghost btn-sm" @click="editFunc(f)" title="编辑">✎</button>
                                     <button class="btn btn-ghost btn-sm" @click="deleteFunc(f)" title="删除" style="color:var(--danger)">✕</button>
                                 </td>
@@ -181,7 +181,8 @@
                             </tr></thead>
                             <tbody>
                                 <tr v-for="(f, idx) in failures" :key="f.id"
-                                    :class="{ 'row-h': f.rpn >= 200, 'row-m': f.rpn >= 100 && f.rpn < 200 }">
+                                    :class="{ 'row-h': f.rpn >= 200, 'row-m': f.rpn >= 100 && f.rpn < 200 }"
+                                    @dblclick="editDfmea(f)">
                                     <td class="nowrap" v-show="dfmeaCol.seq">[[ idx + 1 ]]</td>
                                     <td class="nowrap" :title="f.function_desc" v-show="dfmeaCol.func" class="bg-core">[[ truncate(f.function_desc, 18) ]]</td>
                                     <td :title="f.mode_desc" @dblclick="editDfmea(f)" v-show="dfmeaCol.mode" class="bg-core">[[ truncate(f.mode_desc, 22) ]]</td>
@@ -205,7 +206,7 @@
                                         <span v-else style="color:var(--text-secondary);font-size:.75rem">-</span>
                                     </td>
                                     <td class="nowrap bg-action" v-show="dfmeaCol.status">[[ f.action_status || '-' ]]</td>
-                                    <td class="nowrap">
+                                    <td class="nowrap" @dblclick.stop>
                                         <button class="btn btn-ghost btn-sm" @click="editDfmea(f)" title="编辑">&#9998;</button>
                                         <button class="btn btn-ghost btn-sm" @click="deleteDfmea(f)" title="删除" style="color:var(--danger)">&#10005;</button>
                                     </td>
@@ -318,9 +319,10 @@
     <div v-if="ctxMenu.show" class="ctx-backdrop" @click="hideCtxMenu"></div>
 
     <!-- 功能项编辑模态框 -->
-    <div v-if="showFuncModal" class="modal-overlay" @click.self="showFuncModal=false">
-        <div class="modal" ref="funcModalEl" style="max-width:760px;min-width:560px;position:relative" @click.stop>
-            <h2>[[ editingFunc ? '编辑功能' : '添加功能' ]]</h2>
+    <div v-if="showFuncModal" class="modal-overlay">
+        <div class="modal" ref="funcModalEl" style="max-width:760px;min-width:560px;position:relative;display:flex;flex-direction:column;max-height:85vh" @click.stop>
+            <h2 style="flex-shrink:0">[[ editingFunc ? '编辑功能' : '添加功能' ]]</h2>
+            <div style="flex:1;min-height:0;overflow-y:auto;padding:0 2px">
             <div class="form-group">
                 <label>功能描述 <span style="color:var(--danger)">*</span></label>
                 <textarea v-model="funcForm.function_desc" placeholder="描述该功能的作用" rows="2"></textarea>
@@ -337,7 +339,8 @@
                 <label>接口说明</label>
                 <textarea v-model="funcForm.interface_desc" placeholder="输入/输出接口描述" rows="3"></textarea>
             </div>
-            <div class="modal-actions">
+            </div>
+            <div class="modal-actions" style="flex-shrink:0">
                 <button class="btn btn-ghost" @click="showFuncModal=false">取消</button>
                 <button class="btn btn-primary" @click="saveFunc" :disabled="!funcForm.function_desc.trim()">保存</button>
             </div>
@@ -360,16 +363,16 @@
     </div>
 
     <!-- DFMEA 编辑模态框 -->
-    <div v-if="showDfmeaModal" class="modal-overlay" @click.self="showDfmeaModal=false">
-        <div class="modal" ref="dfmeaModalEl" style="max-width:1060px;min-width:860px;padding:0;overflow:hidden;position:relative" @click.stop>
+    <div v-if="showDfmeaModal" class="modal-overlay">
+        <div class="modal" ref="dfmeaModalEl" style="max-width:1060px;min-width:860px;padding:0;position:relative;display:flex;flex-direction:column;max-height:90vh" @click.stop>
             <!-- Header -->
-            <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem">
+            <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem;flex-shrink:0">
                 <h2 style="margin:0;flex:1">[[ editingDfmea ? '编辑失效模式' : '添加失效模式' ]]</h2>
                 <button class="btn btn-ghost btn-sm" @click="showDfmeaModal=false">✕</button>
             </div>
 
             <!-- Quick fill (add mode only) -->
-            <div style="padding:.75rem 1.5rem;border-bottom:1px solid var(--border-light);background:var(--bg)" v-if="!editingDfmea && allFailuresForFill.length > 0">
+            <div style="padding:.75rem 1.5rem;border-bottom:1px solid var(--border-light);background:var(--bg);flex-shrink:0" v-if="!editingDfmea && allFailuresForFill.length > 0">
                 <label style="font-size:.8rem;font-weight:600;color:var(--text-secondary);margin-right:.5rem">快速填充:</label>
                 <select @change="quickFillDfmea($event.target.value)" style="font-size:.82rem;min-width:320px">
                     <option value="">— 选择已有失效模式 —</option>
@@ -378,7 +381,7 @@
             </div>
 
             <!-- Body: two columns -->
-            <div class="modal-dfmea" style="padding:1.25rem 1.5rem;max-height:62vh;overflow-y:auto">
+            <div class="modal-dfmea" style="padding:1.25rem 1.5rem;flex:1;min-height:0;overflow-y:auto">
                 <!-- LEFT COLUMN -->
                 <div class="modal-dfmea-left">
                     <!-- Section: Basic Info -->
@@ -588,7 +591,7 @@
             </div>
 
             <!-- Footer -->
-            <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;gap:.5rem;justify-content:flex-end">
+            <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;gap:.5rem;justify-content:flex-end;flex-shrink:0">
                 <button class="btn btn-ghost" @click="showDfmeaModal=false">取消</button>
                 <button class="btn btn-primary" @click="saveDfmea">保存</button>
             </div>
