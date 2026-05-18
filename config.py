@@ -16,5 +16,5 @@ SCHEMA_SQL = str(BASE_DIR / "db" / "schema.sql")
 SEED_SQL = str(BASE_DIR / "db" / "seed.sql")
 
 # 应用
-APP_TITLE = "DFMEA 个人记录系统"
+APP_TITLE = "DFMEA 记录系统"
 APP_VERSION = "0.1.0"

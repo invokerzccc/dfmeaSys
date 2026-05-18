@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS reference (
     project_id  INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
     node_id     INTEGER REFERENCES structure_node(id) ON DELETE SET NULL,
     title       TEXT    NOT NULL,
-    type        TEXT    NOT NULL DEFAULT '其他' CHECK(type IN ('系统图', '规格书', '分析报告', '其他')),
+    type        TEXT    NOT NULL DEFAULT '其他' CHECK(type IN ('链接', '文档', '图片', '其他')),
     file_path   TEXT    DEFAULT '',   -- 相对 uploads/ 的路径
     url         TEXT    DEFAULT '',   -- 外部链接
     notes       TEXT    DEFAULT '',
@@ -110,7 +110,19 @@ CREATE TABLE IF NOT EXISTS reference (
 CREATE INDEX IF NOT EXISTS idx_ref_project ON reference(project_id);
 
 -- ============================================================
--- 6. 失效模式 ↔ 参考资料关联（多对多）
+-- 6. 结构节点 ↔ 参考资料关联（多对多）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS reference_node (
+    reference_id  INTEGER NOT NULL REFERENCES reference(id) ON DELETE CASCADE,
+    node_id       INTEGER NOT NULL REFERENCES structure_node(id) ON DELETE CASCADE,
+    PRIMARY KEY (reference_id, node_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rn_ref  ON reference_node(reference_id);
+CREATE INDEX IF NOT EXISTS idx_rn_node ON reference_node(node_id);
+
+-- ============================================================
+-- 7. 失效模式 ↔ 参考资料关联（多对多）
 -- ============================================================
 CREATE TABLE IF NOT EXISTS failure_mode_reference (
     failure_mode_id INTEGER NOT NULL REFERENCES failure_mode(id) ON DELETE CASCADE,
@@ -122,7 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_fmr_failure ON failure_mode_reference(failure_mod
 CREATE INDEX IF NOT EXISTS idx_fmr_ref     ON failure_mode_reference(reference_id);
 
 -- ============================================================
--- 7. 操作日志
+-- 8. 操作日志
 -- ============================================================
 CREATE TABLE IF NOT EXISTS audit_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

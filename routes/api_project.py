@@ -24,6 +24,12 @@ def list_projects():
     return project_model.list_projects()
 
 
+@router.get("/projects/trash/list")
+def list_trash():
+    """列出回收站中的项目"""
+    return project_model.list_trash()
+
+
 @router.get("/projects/{project_id}")
 def get_project(project_id: int):
     """获取单个项目详情"""
@@ -54,8 +60,26 @@ def update_project(project_id: int, body: ProjectUpdate):
 
 @router.delete("/projects/{project_id}")
 def delete_project(project_id: int):
-    """删除项目（软删除）"""
+    """删除项目（软删除，移入回收站）"""
     ok = project_model.delete_project(project_id)
     if not ok:
         raise HTTPException(status_code=404, detail="项目不存在")
+    return {"ok": True}
+
+
+@router.post("/projects/{project_id}/restore")
+def restore_project(project_id: int):
+    """从回收站恢复项目"""
+    ok = project_model.restore_project(project_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="项目不存在或不在回收站")
+    return {"ok": True}
+
+
+@router.delete("/projects/{project_id}/permanent")
+def permanent_delete_project(project_id: int):
+    """永久删除项目"""
+    ok = project_model.permanent_delete_project(project_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="项目不存在或不在回收站")
     return {"ok": True}
