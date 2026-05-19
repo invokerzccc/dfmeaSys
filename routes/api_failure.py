@@ -70,6 +70,12 @@ def list_all_failures(project_id: int, user=Depends(auth_svc.require_current_use
     return fm_model.list_all_failures_flat(project_id)
 
 
+@router.get("/projects/{project_id}/failures/all")
+def list_all_failures(project_id: int):
+    """获取项目下所有失效模式（扁平列表，用于关联选择）"""
+    return fm_model.list_all_failures_flat(project_id)
+
+
 @router.get("/nodes/{node_id}/failures")
 def list_failures(node_id: int, user=Depends(auth_svc.require_current_user)):
     """获取节点下所有失效模式（含关联功能描述）"""

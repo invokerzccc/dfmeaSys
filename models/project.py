@@ -156,6 +156,44 @@ def permanent_delete_project(project_id: int):
         conn.close()
 
 
+def list_trash():
+    """列出回收站中的项目"""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM project WHERE is_deleted = 1 ORDER BY updated_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def restore_project(project_id: int):
+    """从回收站恢复项目"""
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "UPDATE project SET is_deleted = 0, updated_at = datetime('now','localtime') WHERE id = ? AND is_deleted = 1",
+            (project_id,),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def permanent_delete_project(project_id: int):
+    """永久删除项目及其所有关联数据"""
+    conn = get_db()
+    try:
+        conn.execute("PRAGMA foreign_keys = ON")
+        cur = conn.execute("DELETE FROM project WHERE id = ? AND is_deleted = 1", (project_id,))
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
 def _copy_structure(conn: sqlite3.Connection, from_project: int, to_project: int):
     """
     从模板项目复制整个结构树到新项目。
