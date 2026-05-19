@@ -58,11 +58,12 @@ def import_json(json_str: str, project_name: str = None):
             func_id_map[f["id"]] = cur.lastrowid
 
         # 恢复失效模式
+        fm_id_map = {}
         for fm in data.get("failures", []):
             new_fid = func_id_map.get(fm["function_item_id"])
             if new_fid is None:
                 continue
-            conn.execute(
+            cur = conn.execute(
                 """INSERT INTO failure_mode (function_item_id, mode_desc, local_effect, potential_effect,
                    severity_S, classification, potential_cause, occurrence_O,
                    prevention_control, detection_control, detection_D,
@@ -78,16 +79,40 @@ def import_json(json_str: str, project_name: str = None):
                  fm.get("revised_S"), fm.get("revised_O"), fm.get("revised_D"), fm.get("revised_RPN"),
                  fm.get("notes", ""), fm.get("order_index", 0)),
             )
+            fm_id_map[fm["id"]] = cur.lastrowid
 
         # 恢复参考材料
+        ref_id_map = {}
         for ref in data.get("references", []):
+            # 仅保留旧格式 node_id 用于回退兼容（新版 JSON 含 reference_nodes）
             new_node_id = node_id_map.get(ref["node_id"]) if ref.get("node_id") else None
-            conn.execute(
+            cur = conn.execute(
                 """INSERT INTO reference (project_id, node_id, title, type, file_path, url, notes)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (new_project_id, new_node_id, ref["title"], ref.get("type", "其他"),
                  ref.get("file_path", ""), ref.get("url", ""), ref.get("notes", "")),
             )
+            ref_id_map[ref["id"]] = cur.lastrowid
+
+        # 恢复 reference_node 多对多关联
+        for rn in data.get("reference_nodes", []):
+            new_ref_id = ref_id_map.get(rn["reference_id"])
+            new_node_id = node_id_map.get(rn["node_id"])
+            if new_ref_id and new_node_id:
+                conn.execute(
+                    "INSERT OR IGNORE INTO reference_node (reference_id, node_id) VALUES (?, ?)",
+                    (new_ref_id, new_node_id),
+                )
+
+        # 恢复 failure_mode_reference 多对多关联
+        for fmr in data.get("failure_mode_references", []):
+            new_fm_id = fm_id_map.get(fmr["failure_mode_id"])
+            new_ref_id = ref_id_map.get(fmr["reference_id"])
+            if new_fm_id and new_ref_id:
+                conn.execute(
+                    "INSERT OR IGNORE INTO failure_mode_reference (failure_mode_id, reference_id) VALUES (?, ?)",
+                    (new_fm_id, new_ref_id),
+                )
 
         conn.commit()
         return new_project_id
@@ -98,27 +123,42 @@ def import_json(json_str: str, project_name: str = None):
 # ── Excel 导入 ──
 # 表头关键词 → 字段名，支持换行变体（如 "严重度\nS" 或 "严重度S"）
 EXCEL_HEADER_KEYWORDS = {
+    # 功能
     "功能描述": "function_desc",
+    "设计要求": "requirement",
+    "性能指标": "performance_spec",
+    "接口说明": "interface_desc",
+    # 失效模式 & 影响
     "失效模式": "mode_desc",
-    "失效影响": "potential_effect",  # 优先匹配更具体的
     "对当前元素": "local_effect",
     "对系统": "potential_effect",
+    "失效影响": "potential_effect",  # 通用回退
+    # 评分
     "严重度": "severity_S",
     "特殊特性": "classification",
     "失效原因": "potential_cause",
     "频度": "occurrence_O",
     "预防控制": "prevention_control",
-    "探测控制": "detection_control",
+    # 探测控制 — 4 阶段列优先于通用列（关键词顺序决定匹配优先级）
+    "探测控制设计": "det_design",
+    "探测控制制程": "det_process",
+    "探测控制验证": "det_verify",
+    "探测控制运维": "det_ops",
+    "探测控制": "detection_control",  # 通用回退（无阶段拆分的单列）
     "探测度": "detection_D",
+    # 改进措施
     "建议措施": "recommended_action",
     "责任人": "action_owner",
     "期限": "action_due_date",
     "措施状态": "action_status",
     "措施效果": "action_effect",
+    # 修订
     "修订S": "revised_S",
     "修订O": "revised_O",
     "修订D": "revised_D",
     "修订RPN": "revised_RPN",
+    # 其他
+    "备注": "notes",
 }
 
 
@@ -151,6 +191,14 @@ def import_xlsx(file_bytes: bytes, project_id: int):
             headers["local_effect"] = cell.column
         elif "失效影响" in sval and ("系统" in sval or "整机" in sval):
             headers["potential_effect"] = cell.column
+        elif "探测控制" in sval and "设计" in sval and "制程" not in sval:
+            headers["det_design"] = cell.column
+        elif "探测控制" in sval and "制程" in sval:
+            headers["det_process"] = cell.column
+        elif "探测控制" in sval and "验证" in sval:
+            headers["det_verify"] = cell.column
+        elif "探测控制" in sval and "运维" in sval:
+            headers["det_ops"] = cell.column
         else:
             for kw, field in EXCEL_HEADER_KEYWORDS.items():
                 if kw in sval and field not in headers:
@@ -177,8 +225,16 @@ def import_xlsx(file_bytes: bytes, project_id: int):
             if not mode_desc:
                 continue  # 没有失效模式的行跳过
 
-            # 查找或创建功能项
-            func_id = _find_or_create_function(conn, default_node_id, func_desc)
+            # 查找或创建功能项（含附加字段）
+            func_id = _find_or_create_function(
+                conn, default_node_id, func_desc,
+                requirement=_get_cell(row, headers, "requirement") or "",
+                performance_spec=_get_cell(row, headers, "performance_spec") or "",
+                interface_desc=_get_cell(row, headers, "interface_desc") or "",
+            )
+
+            # 合并探测控制 4 阶段列 → detection_control 文本
+            det_text = _combine_detection_controls(row, headers)
 
             # 构建失效模式数据
             S = int(_get_cell(row, headers, "severity_S") or 1)
@@ -193,15 +249,15 @@ def import_xlsx(file_bytes: bytes, project_id: int):
                    prevention_control, detection_control, detection_D,
                    rpn, action_priority, recommended_action,
                    action_owner, action_due_date, action_status, action_effect,
-                   revised_S, revised_O, revised_D, revised_RPN)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   revised_S, revised_O, revised_D, revised_RPN, notes)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (func_id, mode_desc,
                  _get_cell(row, headers, "local_effect") or "",
                  _get_cell(row, headers, "potential_effect") or "",
                  S, _get_cell(row, headers, "classification") or "",
                  _get_cell(row, headers, "potential_cause") or "", O,
                  _get_cell(row, headers, "prevention_control") or "",
-                 _get_cell(row, headers, "detection_control") or "", D,
+                 det_text, D,
                  rpn, ap, _get_cell(row, headers, "recommended_action") or "",
                  _get_cell(row, headers, "action_owner") or "",
                  _get_cell(row, headers, "action_due_date") or "",
@@ -211,6 +267,7 @@ def import_xlsx(file_bytes: bytes, project_id: int):
                  int(r) if (r := _get_cell(row, headers, "revised_O")) else None,
                  int(r) if (r := _get_cell(row, headers, "revised_D")) else None,
                  int(r) if (r := _get_cell(row, headers, "revised_RPN")) else None,
+                 _get_cell(row, headers, "notes") or "",
                  ),
             )
             imported += 1
@@ -219,6 +276,25 @@ def import_xlsx(file_bytes: bytes, project_id: int):
         return imported
     finally:
         conn.close()
+
+
+def _combine_detection_controls(row, headers):
+    """将 4 阶段探测控制列合并为 detection_control 文本"""
+    stages = [
+        ("det_design", "[设计]"),
+        ("det_process", "[制程]"),
+        ("det_verify", "[验证]"),
+        ("det_ops", "[运维]"),
+    ]
+    parts = []
+    for field, tag in stages:
+        val = _get_cell(row, headers, field)
+        if val:
+            parts.append(f"{tag} {val}")
+    if parts:
+        return "\n".join(parts)
+    # 回退到通用单列
+    return _get_cell(row, headers, "detection_control") or ""
 
 
 def _get_cell(row, headers, key):
@@ -232,16 +308,23 @@ def _get_cell(row, headers, key):
     return str(val).strip() if val not in (None, "") else ""
 
 
-def _find_or_create_function(conn, node_id, func_desc):
+def _find_or_create_function(conn, node_id, func_desc, requirement="", performance_spec="", interface_desc=""):
     row = conn.execute(
         "SELECT id FROM function_item WHERE node_id = ? AND function_desc = ?",
         (node_id, func_desc),
     ).fetchone()
     if row:
+        # 更新已有记录的额外字段（如果导入提供了更完整的数据）
+        if requirement or performance_spec or interface_desc:
+            conn.execute(
+                "UPDATE function_item SET requirement=?, performance_spec=?, interface_desc=? WHERE id=?",
+                (requirement, performance_spec, interface_desc, row["id"]),
+            )
         return row["id"]
     cur = conn.execute(
-        "INSERT INTO function_item (node_id, function_desc) VALUES (?, ?)",
-        (node_id, func_desc),
+        "INSERT INTO function_item (node_id, function_desc, requirement, performance_spec, interface_desc)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (node_id, func_desc, requirement, performance_spec, interface_desc),
     )
     return cur.lastrowid
 

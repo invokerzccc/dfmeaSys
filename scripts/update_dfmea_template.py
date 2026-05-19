@@ -1,7 +1,8 @@
 """Replace DFMEA table section with new version with column visibility toggle"""
 import re
+from pathlib import Path
 
-path = r'C:\Users\invok\OneDrive\Codes\AI_DFMEA\YL\templates\project.html'
+path = str(Path(__file__).resolve().parent.parent / "templates" / "project.html")
 with open(path, 'r', encoding='utf-8') as f:
     content = f.read()
 

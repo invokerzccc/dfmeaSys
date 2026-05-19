@@ -22,8 +22,9 @@ DFMEA_HEADERS   = [
 ]
 ACTION_HEADERS  = ["建议措施", "责任人", "期限", "措施状态", "措施效果"]
 REVISED_HEADERS = ["修订S", "修订O", "修订D", "修订RPN"]
+NOTES_HEADERS  = ["备注"]
 
-ALL_HEADERS = BASIC_HEADERS + FUNC_HEADERS + DFMEA_HEADERS + ACTION_HEADERS + REVISED_HEADERS
+ALL_HEADERS = BASIC_HEADERS + FUNC_HEADERS + DFMEA_HEADERS + ACTION_HEADERS + REVISED_HEADERS + NOTES_HEADERS
 
 # 分组列范围 (1-indexed)
 BASIC_START  = 1
@@ -36,6 +37,9 @@ ACTION_START = DFMEA_END + 1                                         # 25
 ACTION_END   = DFMEA_END + len(ACTION_HEADERS)                       # 29
 REVISED_START = ACTION_END + 1                                       # 30
 REVISED_END  = ACTION_END + len(REVISED_HEADERS)                     # 33
+NOTES_START  = REVISED_END + 1                                        # 34
+NOTES_END    = REVISED_END + len(NOTES_HEADERS)                       # 34
+NOTES_COL_NUM = NOTES_START                                           # 34
 
 # 关键列号 (1-indexed)
 _DFMEA_BASE = FUNC_END  # 9
@@ -75,6 +79,8 @@ FUNC_GROUP_FILL    = PatternFill(start_color="DCF0E4", end_color="DCF0E4", fill_
 DFMEA_GROUP_FILL   = PatternFill(start_color="FDE8D0", end_color="FDE8D0", fill_type="solid")
 ACTION_GROUP_FILL  = PatternFill(start_color="E8DEF0", end_color="E8DEF0", fill_type="solid")
 REVISED_GROUP_FILL = PatternFill(start_color="E8ECEF", end_color="E8ECEF", fill_type="solid")
+NOTES_GROUP_FILL  = PatternFill(start_color="F5F5F0", end_color="F5F5F0", fill_type="solid")
+NOTES_FILL        = PatternFill(start_color="8899A6", end_color="8899A6", fill_type="solid")
 
 RPN_HIGH_FILL = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
 RPN_MID_FILL  = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
@@ -88,6 +94,7 @@ GROUP_FONT_F  = Font(size=10, bold=True, color="2D5A3A")
 GROUP_FONT_D  = Font(size=10, bold=True, color="8B5A28")
 GROUP_FONT_A  = Font(size=10, bold=True, color="5A3E7A")
 GROUP_FONT_R  = Font(size=10, bold=True, color="556677")
+GROUP_FONT_N  = Font(size=10, bold=True, color="888888")
 DATA_FONT      = Font(size=9)
 PATH_FILL      = PatternFill(start_color="F7FAFC", end_color="F7FAFC", fill_type="solid")
 DETECT_FILLS   = {
@@ -238,6 +245,7 @@ def _write_section_headers(ws, row):
         (DFMEA_START, DFMEA_END,   "DFMEA 失效分析", DFMEA_GROUP_FILL, GROUP_FONT_D),
         (ACTION_START, ACTION_END, "改进措施", ACTION_GROUP_FILL,  GROUP_FONT_A),
         (REVISED_START, REVISED_END, "修订评分", REVISED_GROUP_FILL, GROUP_FONT_R),
+        (NOTES_START, NOTES_END,   "备注",     NOTES_GROUP_FILL,   GROUP_FONT_N),
     ]
     for start, end, label, fill, font in sections_config:
         if start <= end:
@@ -266,6 +274,7 @@ def _write_headers(ws, row, headers):
         (DFMEA_START, DFMEA_END, DFMEA_FILL),
         (ACTION_START, ACTION_END, ACTION_FILL),
         (REVISED_START, REVISED_END, REVISED_FILL),
+        (NOTES_START, NOTES_END, NOTES_FILL),
     ]
     for start, end, fill in color_mapping:
         for c in range(start, end + 1):
@@ -359,6 +368,7 @@ def _build_data_row(row, levels, seq):
             row["revised_D"] if row["revised_D"] is not None else "",
             "",  # 修订RPN — formula
         ]
+        + [row["notes"] or ""]
     )
 
 
@@ -486,6 +496,7 @@ def export_xlsx(project_id: int):
             22: 5, 23: 7, 24: 5,                           # D/RPN/AP
             25: 20, 26: 8, 27: 10, 28: 8, 29: 16,          # 改进措施
             30: 6, 31: 6, 32: 6, 33: 8,                   # 修订评分
+            34: 16,                                       # 备注
         }
         for col_idx, w in col_widths.items():
             if col_idx <= ncols:
@@ -555,7 +566,7 @@ def export_template():
     ws.conditional_formatting.add(ap_range,
         CellIsRule(operator="equal", formula=['"L"'], fill=AP_L_FILL, font=Font(size=9, bold=True, color="16A34A")))
 
-    col_widths = [5, 18, 18, 18, 18, 18, 20, 20, 16, 18, 20, 20, 5, 6, 24, 5, 22, 20, 20, 20, 20, 5, 7, 5, 20, 8, 10, 8, 16, 6, 6, 6, 8]
+    col_widths = [5, 18, 18, 18, 18, 18, 20, 20, 16, 18, 20, 20, 5, 6, 24, 5, 22, 20, 20, 20, 20, 5, 7, 5, 20, 8, 10, 8, 16, 6, 6, 6, 8, 16]
     for col_idx, w in enumerate(col_widths, 1):
         if col_idx <= ncols:
             ws.column_dimensions[get_column_letter(col_idx)].width = w
@@ -600,14 +611,34 @@ def export_json(project_id: int):
 
         refs = conn.execute("SELECT * FROM reference WHERE project_id = ?", (project_id,)).fetchall()
 
+        # 导出关联表
+        ref_nodes = []
+        fm_refs = []
+        if refs:
+            ref_ids = [r["id"] for r in refs]
+            r_placeholders = ",".join("?" for _ in ref_ids)
+            ref_nodes = conn.execute(
+                f"SELECT * FROM reference_node WHERE reference_id IN ({r_placeholders})",
+                ref_ids,
+            ).fetchall()
+        if failures:
+            fm_ids = [fm["id"] for fm in failures]
+            f_placeholders = ",".join("?" for _ in fm_ids)
+            fm_refs = conn.execute(
+                f"SELECT * FROM failure_mode_reference WHERE failure_mode_id IN ({f_placeholders})",
+                fm_ids,
+            ).fetchall()
+
         return json.dumps({
-            "version": "0.2",
+            "version": "2.0",
             "exported_at": proj["updated_at"],
             "project": dict(proj),
             "structure": [dict(n) for n in nodes],
             "functions": [dict(f) for f in functions],
             "failures": [dict(fm) for fm in failures],
             "references": [dict(r) for r in refs],
+            "reference_nodes": [dict(rn) for rn in ref_nodes],
+            "failure_mode_references": [dict(fmr) for fmr in fm_refs],
         }, ensure_ascii=False, indent=2, default=str)
 
     finally:

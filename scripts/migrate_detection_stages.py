@@ -1,7 +1,10 @@
 """Migrate detection_control stage names in all failure_mode entries."""
-import sqlite3
+import sys
+from pathlib import Path
 
-DB_PATH = r"C:\Users\invok\dfmea_db\dfmea.db"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import DB_PATH
+import sqlite3
 
 mappings = [
     ("[下线检测]", "[制程]"),
