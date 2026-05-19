@@ -1,7 +1,12 @@
 """Check database state"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import DB_PATH
 import sqlite3
 
-conn = sqlite3.connect(r'C:\Users\invok\dfmea_db\dfmea.db')
+conn = sqlite3.connect(DB_PATH)
 conn.row_factory = sqlite3.Row
 
 print('=== FULL REFERENCE ===')

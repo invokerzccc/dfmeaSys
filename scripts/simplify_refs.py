@@ -1,5 +1,7 @@
 """Simplify references tab: type filters, no associations, merged add button"""
-path = r'C:\Users\invok\OneDrive\Codes\AI_DFMEA\YL\templates\project.html'
+from pathlib import Path
+
+path = str(Path(__file__).resolve().parent.parent / "templates" / "project.html")
 with open(path, 'r', encoding='utf-8') as f:
     content = f.read()
 
