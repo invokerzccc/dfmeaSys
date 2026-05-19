@@ -5,6 +5,11 @@
         <span class="logo">DFMEA</span>
         <span class="text-muted" style="font-size:.8rem">设计失效模式与影响分析</span>
         <span class="sep"></span>
+        <span class="text-muted" style="font-size:.8rem">{{ current_user.display_name }}</span>
+        {% if current_user.is_admin %}
+        <a href="/admin" class="btn btn-ghost btn-sm">账号管理</a>
+        {% endif %}
+        <button class="btn btn-ghost btn-sm" @click="logout">退出</button>
         <button class="btn btn-ghost btn-sm" @click="showTrash = !showTrash; if (showTrash) loadTrash()">
             &#128465; 回收站 [[ trashCount > 0 ? '(' + trashCount + ')' : '' ]]
         </button>
@@ -222,6 +227,10 @@ createApp({
 
         onMounted(function () { loadProjects(); loadTrash(); });
 
+        function logout() {
+            API.post('/api/v1/auth/logout', {}).finally(function () { window.location.href = '/login'; });
+        }
+
         return {
             projects: projects, loading: loading, search: search,
             showModal: showModal, viewMode: viewMode, form: form,
@@ -232,6 +241,7 @@ createApp({
             openProject: openProject, toggleViewMode: toggleViewMode,
             restoreProject: restoreProject, permanentDelete: permanentDelete,
             loadTrash: loadTrash,
+            logout: logout,
             formatDate: formatDate,
         };
     }

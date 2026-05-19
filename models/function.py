@@ -1,6 +1,7 @@
 """功能项数据访问"""
 
 from db.database import get_db
+from models.project import VersionConflict
 
 
 def list_functions(node_id: int):
@@ -53,6 +54,7 @@ def create_function(node_id: int, function_desc: str, **kwargs):
 
 def update_function(func_id: int, **kwargs):
     """更新功能项字段"""
+    expected_version = kwargs.pop("expected_version", None)
     allowed = {"function_desc", "requirement", "performance_spec", "interface_desc", "order_index"}
     updates = {k: v for k, v in kwargs.items() if k in allowed}
     if not updates:
@@ -62,11 +64,19 @@ def update_function(func_id: int, **kwargs):
     try:
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values())
-        conn.execute(
-            f"UPDATE function_item SET {set_clause} WHERE id = ?",
-            values + [func_id],
-        )
+        if expected_version is None:
+            cur = conn.execute(
+                f"UPDATE function_item SET {set_clause}, version = version + 1, updated_at = datetime('now','localtime') WHERE id = ?",
+                values + [func_id],
+            )
+        else:
+            cur = conn.execute(
+                f"UPDATE function_item SET {set_clause}, version = version + 1, updated_at = datetime('now','localtime') WHERE id = ? AND version = ?",
+                values + [func_id, expected_version],
+            )
         conn.commit()
+        if cur.rowcount == 0 and get_function(func_id):
+            raise VersionConflict()
         return get_function(func_id)
     finally:
         conn.close()

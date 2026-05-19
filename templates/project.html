@@ -5,11 +5,17 @@
         <a href="/" class="btn btn-ghost btn-sm">← 返回</a>
         <span class="text-muted" style="font-size:.8rem">[[ project.name ]]</span>
         <span class="sep"></span>
+        <span class="text-muted" style="font-size:.8rem">{{ current_user.display_name }}</span>
+        {% if current_user.is_admin %}
+        <a href="/admin" class="btn btn-ghost btn-sm">账号管理</a>
+        {% endif %}
+        <button class="btn btn-ghost btn-sm" @click="logout">退出</button>
         <nav class="tabs">
             <span class="tab-item" :class="{ active: tab === 'structure' }" @click="tab = 'structure'">结构树</span>
             <span class="tab-item" :class="{ active: tab === 'functions' }" @click="tab = 'functions'">功能分析</span>
             <span class="tab-item" :class="{ active: tab === 'dfmea' }" @click="tab = 'dfmea'">DFMEA 工作表</span>
             <span class="tab-item" :class="{ active: tab === 'references' }" @click="tab = 'references'">参考材料</span>
+            <span class="tab-item" v-if="canManageMembers" :class="{ active: tab === 'members' }" @click="tab = 'members'">成员</span>
             <span class="tab-item" :class="{ active: tab === 'export' }" @click="tab = 'export'">导出</span>
         </nav>
     </header>
@@ -254,6 +260,51 @@
                 <div v-else class="empty-state" style="padding:3rem">
                     <p>暂无参考材料</p>
                     <p class="text-muted">上传系统图、规格书等参考文件或添加外部链接</p>
+                </div>
+            </div>
+
+            <!-- 成员 Tab -->
+            <div v-else-if="tab === 'members' && canManageMembers">
+                <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+                    <h2 style="flex:1">项目成员 — [[ project.name ]]</h2>
+                    <span class="text-muted" style="font-size:.8rem">负责人可分配本项目编辑权限</span>
+                </div>
+
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1rem">
+                    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+                        <select v-model="memberForm.user_id" style="width:220px">
+                            <option :value="null">选择用户</option>
+                            <option v-for="u in memberCandidates" :key="u.id" :value="u.id">[[ u.username ]] [[ u.display_name ? '— ' + u.display_name : '' ]]</option>
+                        </select>
+                        <select v-model="memberForm.role" style="width:140px">
+                            <option value="editor">可编辑</option>
+                            <option value="owner">负责人</option>
+                            <option value="viewer">只读</option>
+                        </select>
+                        <button class="btn btn-primary btn-sm" @click="saveProjectMember" :disabled="!memberForm.user_id">分配</button>
+                        <span class="text-muted" style="font-size:.8rem">普通用户默认可读全部项目；这里控制谁能编辑。</span>
+                    </div>
+                </div>
+
+                <table class="project-table" v-if="projectMembers.length > 0">
+                    <thead><tr>
+                        <th>用户名</th>
+                        <th>显示名</th>
+                        <th class="col-stat">角色</th>
+                        <th style="width:110px">操作</th>
+                    </tr></thead>
+                    <tbody>
+                        <tr v-for="m in projectMembers" :key="m.id">
+                            <td class="col-name">[[ m.username ]]</td>
+                            <td>[[ m.display_name || '-' ]]</td>
+                            <td class="col-stat">[[ roleLabel(m.role) ]]</td>
+                            <td><button class="btn btn-ghost btn-sm" @click="removeProjectMember(m)">移除</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div v-else class="empty-state" style="padding:3rem">
+                    <p>暂无已分配成员</p>
+                    <p class="text-muted">管理员仍可编辑所有项目；负责人可在这里添加项目成员</p>
                 </div>
             </div>
 
@@ -795,6 +846,7 @@ createApp({
             if (val === 'functions' && activeNodeId.value) loadFunctions();
             if (val === 'dfmea' && activeNodeId.value) { loadFailures(); loadFunctionsForDfmea(); }
             if (val === 'references') { loadReferences(); loadAllNodesFlat(); }
+            if (val === 'members' && canManageMembers.value) { loadProjectMembers(); loadMemberCandidates(); }
         });
 
         // 侧栏缩放
@@ -976,6 +1028,12 @@ createApp({
         const allNodesFlat = ref([]);
         const refForm = reactive({ title: '', type: '其他', node_id: null, url: '', notes: '' });
 
+        // 成员权限状态
+        const canManageMembers = ref(false);
+        const projectMembers = ref([]);
+        const memberCandidates = ref([]);
+        const memberForm = reactive({ user_id: null, role: 'editor' });
+
         // 导入导出状态
         const xlsxImporting = ref(false);
         const xlsxResult = ref('');
@@ -1024,6 +1082,7 @@ createApp({
             functions: '功能分析',
             dfmea: 'DFMEA 工作表',
             references: '参考材料',
+            members: '成员管理',
             export: '导入导出',
         }[tab.value]));
 
@@ -1032,7 +1091,18 @@ createApp({
             try {
                 project.value = await API.get('/api/v1/projects/' + PROJECT_ID);
                 document.title = project.value.name + ' — DFMEA';
+                await loadProjectPermissions();
             } catch (e) { showToast('加载项目失败', 'warning'); }
+        }
+
+        async function loadProjectPermissions() {
+            try {
+                const perms = await API.get('/api/v1/projects/' + PROJECT_ID + '/permissions');
+                canManageMembers.value = !!perms.can_manage_members;
+                if (!canManageMembers.value && tab.value === 'members') tab.value = 'structure';
+            } catch (e) {
+                canManageMembers.value = false;
+            }
         }
 
         async function loadStructure() {
@@ -1246,6 +1316,7 @@ createApp({
             };
             try {
                 if (editingFunc.value) {
+                    data.expected_version = editingFunc.value.version;
                     await API.put('/api/v1/functions/' + editingFunc.value.id, data);
                 } else {
                     await API.post('/api/v1/nodes/' + activeNodeId.value + '/functions', data);
@@ -1439,6 +1510,7 @@ createApp({
         async function saveDfmea() {
             const data = { ...dfmeaForm };
             data.reference_ids = [...dfmeaSelectedRefIds.value];
+            if (editingDfmea.value) data.expected_version = editingDfmea.value.version;
             // 将多条目数组 join 为换行分隔文本
             data.potential_cause = dfmeaItems.potential_cause.filter(s => s.trim()).join('\n');
             data.prevention_control = dfmeaItems.prevention_control.filter(s => s.trim()).join('\n');
@@ -1527,7 +1599,7 @@ createApp({
             fd.append('file', selectedFile.value);
             fd.append('title', refForm.title.trim());
             fd.append('type', refForm.type);
-            if (refForm.node_id) fd.append('node_id', String(refForm.node_id));
+            fd.append('node_ids', JSON.stringify(refForm.node_id ? [refForm.node_id] : []));
             fd.append('notes', refForm.notes);
 
             try {
@@ -1544,7 +1616,7 @@ createApp({
                 await API.post('/api/v1/projects/' + PROJECT_ID + '/references', {
                     title: refForm.title.trim(),
                     type: refForm.type,
-                    node_id: refForm.node_id,
+                    node_ids: refForm.node_id ? [refForm.node_id] : [],
                     url: refForm.url.trim(),
                     notes: refForm.notes,
                 });
@@ -1556,7 +1628,7 @@ createApp({
 
         async function deleteRef(r) {
             if (!await confirmDlg('删除参考材料 "' + r.title + '"？')) return;
-            const backup = { title: r.title, type: r.type, url: r.url, notes: r.notes, node_id: r.node_id };
+            const backup = { title: r.title, type: r.type, url: r.url, notes: r.notes, node_ids: (r.nodes || []).map(n => n.id) };
             try {
                 await API.del('/api/v1/references/' + r.id);
                 loadReferences();
@@ -1578,6 +1650,57 @@ createApp({
 
         function isImage(path) {
             return /\.(png|jpg|jpeg|gif|svg|webp|bmp)$/i.test(path || '');
+        }
+
+        // ── 项目成员 ──
+        async function loadProjectMembers() {
+            if (!canManageMembers.value) return;
+            try {
+                projectMembers.value = await API.get('/api/v1/projects/' + PROJECT_ID + '/members');
+            } catch (e) {
+                projectMembers.value = [];
+                showToast('加载成员失败: ' + e.message, 'warning');
+            }
+        }
+
+        async function loadMemberCandidates() {
+            if (!canManageMembers.value) return;
+            try {
+                memberCandidates.value = await API.get('/api/v1/projects/' + PROJECT_ID + '/member-candidates');
+            } catch (e) {
+                memberCandidates.value = [];
+            }
+        }
+
+        async function saveProjectMember() {
+            if (!memberForm.user_id) return;
+            try {
+                await API.put('/api/v1/projects/' + PROJECT_ID + '/members', {
+                    user_id: memberForm.user_id,
+                    role: memberForm.role,
+                });
+                memberForm.user_id = null;
+                memberForm.role = 'editor';
+                await loadProjectMembers();
+                showToast('成员权限已更新', 'success');
+            } catch (e) {
+                showToast('分配失败: ' + e.message, 'warning');
+            }
+        }
+
+        async function removeProjectMember(member) {
+            if (!await confirmDlg('移除 "' + member.username + '" 的项目权限？')) return;
+            try {
+                await API.del('/api/v1/projects/' + PROJECT_ID + '/members/' + member.id);
+                await loadProjectMembers();
+                showToast('已移除成员权限', 'success');
+            } catch (e) {
+                showToast('移除失败: ' + e.message, 'warning');
+            }
+        }
+
+        function roleLabel(role) {
+            return role === 'owner' ? '负责人' : role === 'editor' ? '可编辑' : '只读';
         }
 
         async function importXlsx(e) {
@@ -1627,14 +1750,20 @@ createApp({
         const debouncedSave = debounce(async () => {
             if (!activeNode.value) return;
             try {
-                await API.put('/api/v1/structure/' + activeNode.value.id, {
+                const saved = await API.put('/api/v1/structure/' + activeNode.value.id, {
                     name: activeNode.value.name,
                     type: activeNode.value.type,
                     part_number: activeNode.value.part_number,
                     description: activeNode.value.description,
+                    expected_version: activeNode.value.version,
                 });
+                activeNode.value.version = saved.version;
             } catch (e) { /* silent */ }
         }, 800);
+
+        function logout() {
+            API.post('/api/v1/auth/logout', {}).finally(function () { window.location.href = '/login'; });
+        }
 
         // ── 键盘快捷键 ──
         function onKeydown(e) {
@@ -1652,6 +1781,7 @@ createApp({
             ctxMenu, dragNodeId, dropTarget,
             sidebarWidth, isResizing, startResize,
             selectNode, loadStructure, addRootNode, debouncedSave,
+            logout,
             onCtxMenu, hideCtxMenu,
             doAddChild, doRename, doMoveUp, doMoveDown, doDelete,
             onDragBegin, onDragOver, onDragLeave, onDropped, onDragEnd,
@@ -1672,6 +1802,9 @@ createApp({
             // 参考材料
             references, showRefUpload, showRefUrl, selectedFile, refFilterNode, allNodesFlat, refForm,
             loadReferences, openRefUpload, openRefUrl, onFileSelected, uploadRef, saveRefUrl, deleteRef, openRef, isImage,
+            // 项目成员
+            canManageMembers, projectMembers, memberCandidates, memberForm,
+            loadProjectMembers, loadMemberCandidates, saveProjectMember, removeProjectMember, roleLabel,
             // 导入导出
             xlsxImporting, xlsxResult, jsonImporting, jsonResult, importXlsx, importJson,
             // 评分准则

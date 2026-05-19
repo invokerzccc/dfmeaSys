@@ -5,10 +5,18 @@
 
 // ---- API Wrapper ----
 var API = {
-  get: async function (url) { var r = await fetch(url); if (!r.ok) throw new Error(await r.text()); return r.json(); },
-  post: async function (url, data) { var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!r.ok) throw new Error(await r.text()); return r.json(); },
-  put: async function (url, data) { var r = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!r.ok) throw new Error(await r.text()); return r.json(); },
-  del: async function (url) { var r = await fetch(url, { method: 'DELETE' }); if (!r.ok) throw new Error(await r.text()); return r.json(); },
+  _handle: async function (r) {
+    if (r.status === 401 && window.location.pathname !== '/login') {
+      window.location.href = '/login';
+      throw new Error('请先登录');
+    }
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  get: async function (url) { return API._handle(await fetch(url)); },
+  post: async function (url, data) { return API._handle(await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })); },
+  put: async function (url, data) { return API._handle(await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })); },
+  del: async function (url) { return API._handle(await fetch(url, { method: 'DELETE' })); },
 };
 
 // ---- Toast ----

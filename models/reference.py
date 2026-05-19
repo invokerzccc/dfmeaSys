@@ -1,6 +1,7 @@
 """参考材料数据访问"""
 
 from db.database import get_db
+from models.project import VersionConflict
 
 
 def _attach_nodes(conn, refs):
@@ -58,8 +59,8 @@ def _set_failure_modes(conn, ref_id, fm_ids):
     if fm_ids:
         for fid in fm_ids:
             conn.execute(
-                "INSERT OR IGNORE INTO failure_mode_reference (reference_id, failure_mode_id) VALUES (?, ?)",
-                (ref_id, fid),
+                "INSERT OR IGNORE INTO failure_mode_reference (failure_mode_id, reference_id) VALUES (?, ?)",
+                (fid, ref_id),
             )
 
 
@@ -129,6 +130,7 @@ def create_reference(project_id: int, title: str, **kwargs):
 
 
 def update_reference(ref_id: int, **kwargs):
+    expected_version = kwargs.pop("expected_version", None)
     allowed = {"title", "type", "file_path", "url", "notes"}
     updates = {k: v for k, v in kwargs.items() if k in allowed}
     node_ids = kwargs.get("node_ids")
@@ -138,10 +140,18 @@ def update_reference(ref_id: int, **kwargs):
         if updates:
             set_clause = ", ".join(f"{k} = ?" for k in updates)
             values = list(updates.values())
-            conn.execute(
-                f"UPDATE reference SET {set_clause} WHERE id = ?",
-                values + [ref_id],
-            )
+            if expected_version is None:
+                cur = conn.execute(
+                    f"UPDATE reference SET {set_clause}, version = version + 1, updated_at = datetime('now','localtime') WHERE id = ?",
+                    values + [ref_id],
+                )
+            else:
+                cur = conn.execute(
+                    f"UPDATE reference SET {set_clause}, version = version + 1, updated_at = datetime('now','localtime') WHERE id = ? AND version = ?",
+                    values + [ref_id, expected_version],
+                )
+            if cur.rowcount == 0 and get_reference(ref_id):
+                raise VersionConflict()
         if node_ids is not None:
             _set_nodes(conn, ref_id, node_ids)
         fm_ids = kwargs.get("failure_mode_ids")

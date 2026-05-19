@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block body %}
+<div id="app" class="app-layout">
+    <header class="app-header">
+        <a href="/" class="btn btn-ghost btn-sm">← 返回</a>
+        <span class="logo">账号管理</span>
+        <span class="sep"></span>
+        <span class="text-muted" style="font-size:.8rem">{{ current_user.display_name }}</span>
+    </header>
+
+    <main class="app-main">
+        <div class="dashboard-header">
+            <h1>用户账户</h1>
+            <button class="btn btn-primary" @click="openCreate">+ 添加账户</button>
+        </div>
+
+        <table class="project-table">
+            <thead><tr>
+                <th>用户名</th>
+                <th>显示名</th>
+                <th class="col-stat">管理员</th>
+                <th class="col-stat">启用</th>
+                <th style="width:180px">更新时间</th>
+                <th style="width:130px">操作</th>
+            </tr></thead>
+            <tbody>
+                <tr v-for="u in users" :key="u.id">
+                    <td class="col-name">[[ u.username ]]</td>
+                    <td>[[ u.display_name || '-' ]]</td>
+                    <td class="col-stat">[[ u.is_admin ? '是' : '否' ]]</td>
+                    <td class="col-stat">[[ u.is_active ? '是' : '否' ]]</td>
+                    <td style="font-size:.78rem;color:var(--text-muted)">[[ formatDate(u.updated_at) ]]</td>
+                    <td><button class="btn btn-ghost btn-sm" @click="openEdit(u)">编辑</button></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="dashboard-header" style="margin-top:2rem">
+            <h1>项目编辑权限</h1>
+            <select v-model="selectedProjectId" @change="loadMembers" style="width:320px">
+                <option :value="null">选择项目</option>
+                <option v-for="p in projects" :key="p.id" :value="p.id">[[ p.name ]]</option>
+            </select>
+        </div>
+
+        <div v-if="selectedProjectId" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem">
+            <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem">
+                <select v-model="memberForm.user_id" style="width:220px">
+                    <option :value="null">选择用户</option>
+                    <option v-for="u in users" :key="u.id" :value="u.id">[[ u.username ]]</option>
+                </select>
+                <select v-model="memberForm.role" style="width:140px">
+                    <option value="editor">可编辑</option>
+                    <option value="owner">负责人</option>
+                    <option value="viewer">只读</option>
+                </select>
+                <button class="btn btn-primary btn-sm" @click="saveMember" :disabled="!memberForm.user_id">分配</button>
+                <span class="text-muted" style="font-size:.8rem">普通用户默认可读全部项目；这里只控制编辑权限。</span>
+            </div>
+            <table class="project-table">
+                <thead><tr><th>用户</th><th>显示名</th><th class="col-stat">角色</th><th style="width:100px">操作</th></tr></thead>
+                <tbody>
+                    <tr v-for="m in members" :key="m.id">
+                        <td class="col-name">[[ m.username ]]</td>
+                        <td>[[ m.display_name || '-' ]]</td>
+                        <td class="col-stat">[[ roleLabel(m.role) ]]</td>
+                        <td><button class="btn btn-ghost btn-sm" @click="removeMember(m)">移除</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <div v-if="showModal" class="modal-overlay">
+        <div class="modal">
+            <h2>[[ editing ? '编辑账户' : '添加账户' ]]</h2>
+            <div class="form-group">
+                <label>用户名</label>
+                <input v-model="form.username" :disabled="!!editing">
+            </div>
+            <div class="form-group">
+                <label>显示名</label>
+                <input v-model="form.display_name">
+            </div>
+            <div class="form-group">
+                <label>密码 [[ editing ? '（留空不修改）' : '' ]]</label>
+                <input type="password" v-model="form.password" autocomplete="new-password">
+            </div>
+            <label style="display:block;margin:.75rem 0"><input type="checkbox" v-model="form.is_admin"> 管理员</label>
+            <label v-if="editing" style="display:block;margin:.75rem 0"><input type="checkbox" v-model="form.is_active"> 启用账户</label>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" @click="showModal=false">取消</button>
+                <button class="btn btn-primary" @click="saveUser" :disabled="!canSave">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var { createApp, reactive, ref, computed, onMounted } = Vue;
+createApp({
+    delimiters: ['[[', ']]'],
+    setup: function () {
+        var users = ref([]);
+        var projects = ref([]);
+        var members = ref([]);
+        var selectedProjectId = ref(null);
+        var showModal = ref(false);
+        var editing = ref(null);
+        var form = reactive({ username: '', password: '', display_name: '', is_admin: false, is_active: true });
+        var memberForm = reactive({ user_id: null, role: 'editor' });
+
+        var canSave = computed(function () {
+            if (!editing.value && (!form.username.trim() || form.password.length < 8)) return false;
+            if (editing.value && form.password && form.password.length < 8) return false;
+            return true;
+        });
+
+        async function loadUsers() {
+            users.value = await API.get('/api/v1/admin/users');
+        }
+
+        async function loadProjects() {
+            projects.value = await API.get('/api/v1/projects');
+        }
+
+        async function loadMembers() {
+            if (!selectedProjectId.value) {
+                members.value = [];
+                return;
+            }
+            members.value = await API.get('/api/v1/projects/' + selectedProjectId.value + '/members');
+        }
+
+        function openCreate() {
+            editing.value = null;
+            Object.assign(form, { username: '', password: '', display_name: '', is_admin: false, is_active: true });
+            showModal.value = true;
+        }
+
+        function openEdit(u) {
+            editing.value = u;
+            Object.assign(form, {
+                username: u.username,
+                password: '',
+                display_name: u.display_name || '',
+                is_admin: !!u.is_admin,
+                is_active: !!u.is_active,
+            });
+            showModal.value = true;
+        }
+
+        async function saveUser() {
+            try {
+                if (editing.value) {
+                    var data = {
+                        display_name: form.display_name,
+                        is_admin: form.is_admin,
+                        is_active: form.is_active,
+                    };
+                    if (form.password) data.password = form.password;
+                    await API.put('/api/v1/admin/users/' + editing.value.id, data);
+                } else {
+                    await API.post('/api/v1/admin/users', {
+                        username: form.username,
+                        password: form.password,
+                        display_name: form.display_name,
+                        is_admin: form.is_admin,
+                    });
+                }
+                showModal.value = false;
+                await loadUsers();
+                showToast('已保存', 'success');
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'warning');
+            }
+        }
+
+        async function saveMember() {
+            if (!selectedProjectId.value || !memberForm.user_id) return;
+            try {
+                await API.put('/api/v1/projects/' + selectedProjectId.value + '/members', {
+                    user_id: memberForm.user_id,
+                    role: memberForm.role,
+                });
+                memberForm.user_id = null;
+                memberForm.role = 'editor';
+                await loadMembers();
+                showToast('权限已更新', 'success');
+            } catch (e) {
+                showToast('分配失败: ' + e.message, 'warning');
+            }
+        }
+
+        async function removeMember(m) {
+            try {
+                await API.del('/api/v1/projects/' + selectedProjectId.value + '/members/' + m.id);
+                await loadMembers();
+                showToast('已移除', 'success');
+            } catch (e) {
+                showToast('移除失败: ' + e.message, 'warning');
+            }
+        }
+
+        function roleLabel(role) {
+            return role === 'owner' ? '负责人' : role === 'editor' ? '可编辑' : '只读';
+        }
+
+        onMounted(function () { loadUsers(); loadProjects(); });
+        return { users: users, projects: projects, members: members, selectedProjectId: selectedProjectId,
+            memberForm: memberForm, showModal: showModal, editing: editing, form: form, canSave: canSave,
+            openCreate: openCreate, openEdit: openEdit, saveUser: saveUser,
+            loadMembers: loadMembers, saveMember: saveMember, removeMember: removeMember,
+            roleLabel: roleLabel, formatDate: formatDate };
+    }
+}).mount('#app');
+</script>
+{% endblock %}
