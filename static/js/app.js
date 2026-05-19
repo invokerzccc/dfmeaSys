@@ -5,10 +5,18 @@
 
 // ---- API Wrapper ----
 var API = {
-  get: async function (url) { var r = await fetch(url); if (!r.ok) throw new Error(await r.text()); return r.json(); },
-  post: async function (url, data) { var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!r.ok) throw new Error(await r.text()); return r.json(); },
-  put: async function (url, data) { var r = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!r.ok) throw new Error(await r.text()); return r.json(); },
-  del: async function (url) { var r = await fetch(url, { method: 'DELETE' }); if (!r.ok) throw new Error(await r.text()); return r.json(); },
+  _handle: async function (r) {
+    if (r.status === 401 && window.location.pathname !== '/login') {
+      window.location.href = '/login';
+      throw new Error('请先登录');
+    }
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  get: async function (url) { return API._handle(await fetch(url)); },
+  post: async function (url, data) { return API._handle(await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })); },
+  put: async function (url, data) { return API._handle(await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })); },
+  del: async function (url) { return API._handle(await fetch(url, { method: 'DELETE' })); },
 };
 
 // ---- Toast ----
@@ -154,31 +162,41 @@ function initColumnResize(table) {
   });
 }
 
-// ---- Modal Resize ----
+// ---- Modal Resize (4 edges + 4 corners) ----
 function initModalResize(modal) {
   if (modal.querySelector('.modal-resize-handle')) return;
-  var handle = document.createElement('div');
-  handle.className = 'modal-resize-handle';
-  modal.appendChild(handle);
-  var startX, startY, startW, startH;
-  handle.addEventListener('mousedown', function (e) {
-    e.preventDefault(); e.stopPropagation();
-    startX = e.clientX; startY = e.clientY;
-    startW = modal.offsetWidth; startH = modal.offsetHeight;
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+  var dirs = ['n','s','e','w','ne','nw','se','sw'];
+  dirs.forEach(function (dir) {
+    var h = document.createElement('div');
+    h.className = 'modal-resize-handle modal-resize-' + dir;
+    h.setAttribute('data-dir', dir);
+    modal.appendChild(h);
+    h.addEventListener('mousedown', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var rect = modal.getBoundingClientRect();
+      var startX = e.clientX, startY = e.clientY;
+      var startW = rect.width, startH = rect.height;
+      var startL = rect.left, startT = rect.top;
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      function onMove(ev) {
+        var dx = ev.clientX - startX, dy = ev.clientY - startY;
+        var w = startW, h = startH;
+        if (dir.indexOf('e') >= 0) w = Math.max(360, startW + dx);
+        if (dir.indexOf('w') >= 0) w = Math.max(360, startW - dx);
+        if (dir.indexOf('s') >= 0) h = Math.max(200, startH + dy);
+        if (dir.indexOf('n') >= 0) h = Math.max(200, startH - dy);
+        modal.style.width = w + 'px';
+        modal.style.maxWidth = w + 'px';
+        modal.style.minHeight = h + 'px';
+        modal.style.height = h + 'px';
+      }
+      function onUp() {
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+    });
   });
-  function onMove(e) {
-    var w = Math.max(360, startW + (e.clientX - startX));
-    var h = Math.max(200, startH + (e.clientY - startY));
-    modal.style.width = w + 'px';
-    modal.style.maxWidth = w + 'px';
-    modal.style.minHeight = h + 'px';
-  }
-  function onUp() {
-    document.body.style.userSelect = '';
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
-  }
 }

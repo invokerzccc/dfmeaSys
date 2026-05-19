@@ -14,6 +14,8 @@ from routes.api_function import router as api_function_router
 from routes.api_failure import router as api_failure_router
 from routes.api_reference import router as api_reference_router
 from routes.api_export import router as api_export_router
+from routes.api_auth import router as api_auth_router
+from routes.uploads import router as uploads_router
 import config
 
 
@@ -35,14 +37,13 @@ static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-# 上传文件目录（外部数据盘）
-app.mount("/uploads", StaticFiles(directory=config.UPLOAD_DIR), name="uploads")
-
 # 路由注册
 app.include_router(pages_router)
+app.include_router(api_auth_router)
 app.include_router(api_project_router)
 app.include_router(api_structure_router)
 app.include_router(api_function_router)
 app.include_router(api_failure_router)
 app.include_router(api_reference_router)
 app.include_router(api_export_router)
+app.include_router(uploads_router)

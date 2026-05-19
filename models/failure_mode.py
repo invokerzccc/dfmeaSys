@@ -1,6 +1,7 @@
 """失效模式数据访问"""
 
 from db.database import get_db
+from models.project import VersionConflict
 from services.dfmea_calc import calc_rpn, calc_ap
 
 
@@ -128,6 +129,7 @@ def _set_linked_refs(conn, failure_mode_id: int, reference_ids: list[int]):
 
 def update_failure(fm_id: int, **kwargs):
     """更新失效模式，自动重算 RPN 和 AP"""
+    expected_version = kwargs.pop("expected_version", None)
     allowed = {
         "mode_desc", "local_effect", "potential_effect", "severity_S", "classification",
         "potential_cause", "occurrence_O", "prevention_control",
@@ -158,10 +160,18 @@ def update_failure(fm_id: int, **kwargs):
 
             set_clause = ", ".join(f"{k} = ?" for k in updates)
             values = list(updates.values())
-            conn.execute(
-                f"UPDATE failure_mode SET {set_clause} WHERE id = ?",
-                values + [fm_id],
-            )
+            if expected_version is None:
+                cur = conn.execute(
+                    f"UPDATE failure_mode SET {set_clause}, version = version + 1, updated_at = datetime('now','localtime') WHERE id = ?",
+                    values + [fm_id],
+                )
+            else:
+                cur = conn.execute(
+                    f"UPDATE failure_mode SET {set_clause}, version = version + 1, updated_at = datetime('now','localtime') WHERE id = ? AND version = ?",
+                    values + [fm_id, expected_version],
+                )
+            if cur.rowcount == 0 and get_failure(fm_id):
+                raise VersionConflict()
 
         if reference_ids is not None:
             _set_linked_refs(conn, fm_id, reference_ids)

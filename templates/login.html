@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block body %}
+<div id="app" class="app-layout">
+    <main class="app-main" style="max-width:420px;margin:8vh auto">
+        <div class="modal" style="display:block;position:static;min-width:0">
+            <h1 style="margin-top:0">登录 DFMEA</h1>
+            <div class="form-group">
+                <label>用户名</label>
+                <input v-model="form.username" autocomplete="username" @keyup.enter="login" autofocus>
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" v-model="form.password" autocomplete="current-password" @keyup.enter="login">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" @click="login" :disabled="loading || !form.username || !form.password">
+                    [[ loading ? '登录中...' : '登录' ]]
+                </button>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var { createApp, reactive, ref } = Vue;
+createApp({
+    delimiters: ['[[', ']]'],
+    setup: function () {
+        var form = reactive({ username: '', password: '' });
+        var loading = ref(false);
+        async function login() {
+            if (!form.username || !form.password || loading.value) return;
+            loading.value = true;
+            try {
+                await API.post('/api/v1/auth/login', form);
+                window.location.href = '/';
+            } catch (e) {
+                showToast('登录失败: ' + e.message, 'warning');
+            } finally {
+                loading.value = false;
+            }
+        }
+        return { form: form, loading: loading, login: login };
+    }
+}).mount('#app');
+</script>
+{% endblock %}

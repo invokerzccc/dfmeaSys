@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS project (
     name        TEXT    NOT NULL,
     description TEXT    DEFAULT '',
     is_deleted  INTEGER DEFAULT 0,   -- 软删除标记
+    version     INTEGER DEFAULT 1,   -- 乐观锁版本
     created_at  TEXT    DEFAULT (datetime('now', 'localtime')),
     updated_at  TEXT    DEFAULT (datetime('now', 'localtime'))
 );
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS structure_node (
     part_number  TEXT    DEFAULT '',
     description  TEXT    DEFAULT '',
     order_index  INTEGER DEFAULT 0,
+    version      INTEGER DEFAULT 1,
     created_at   TEXT    DEFAULT (datetime('now', 'localtime')),
     updated_at   TEXT    DEFAULT (datetime('now', 'localtime'))
 );
@@ -45,7 +47,10 @@ CREATE TABLE IF NOT EXISTS function_item (
     requirement     TEXT    DEFAULT '',
     performance_spec TEXT   DEFAULT '',
     interface_desc  TEXT    DEFAULT '',   -- 接口说明（输入/输出）
-    order_index     INTEGER DEFAULT 0
+    order_index     INTEGER DEFAULT 0,
+    version         INTEGER DEFAULT 1,
+    created_at      TEXT    DEFAULT (datetime('now', 'localtime')),
+    updated_at      TEXT    DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_function_node ON function_item(node_id);
@@ -87,7 +92,10 @@ CREATE TABLE IF NOT EXISTS failure_mode (
     revised_RPN        INTEGER DEFAULT NULL,
 
     notes              TEXT    DEFAULT '',
-    order_index        INTEGER DEFAULT 0
+    order_index        INTEGER DEFAULT 0,
+    version            INTEGER DEFAULT 1,
+    created_at         TEXT    DEFAULT (datetime('now', 'localtime')),
+    updated_at         TEXT    DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_failure_function ON failure_mode(function_item_id);
@@ -104,7 +112,9 @@ CREATE TABLE IF NOT EXISTS reference (
     file_path   TEXT    DEFAULT '',   -- 相对 uploads/ 的路径
     url         TEXT    DEFAULT '',   -- 外部链接
     notes       TEXT    DEFAULT '',
-    created_at  TEXT    DEFAULT (datetime('now', 'localtime'))
+    version     INTEGER DEFAULT 1,
+    created_at  TEXT    DEFAULT (datetime('now', 'localtime')),
+    updated_at  TEXT    DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_ref_project ON reference(project_id);
@@ -134,11 +144,46 @@ CREATE INDEX IF NOT EXISTS idx_fmr_failure ON failure_mode_reference(failure_mod
 CREATE INDEX IF NOT EXISTS idx_fmr_ref     ON failure_mode_reference(reference_id);
 
 -- ============================================================
--- 8. 操作日志
+-- 8. 用户、项目成员、登录会话
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_account (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    display_name  TEXT DEFAULT '',
+    is_admin      INTEGER DEFAULT 0,
+    is_active     INTEGER DEFAULT 1,
+    created_at    TEXT DEFAULT (datetime('now', 'localtime')),
+    updated_at    TEXT DEFAULT (datetime('now', 'localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS project_member (
+    project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES user_account(id) ON DELETE CASCADE,
+    role       TEXT NOT NULL DEFAULT 'editor' CHECK(role IN ('owner', 'editor', 'viewer')),
+    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+    PRIMARY KEY (project_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pm_user ON project_member(user_id);
+
+CREATE TABLE IF NOT EXISTS auth_session (
+    token_hash TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES user_account(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_user ON auth_session(user_id);
+
+-- ============================================================
+-- 9. 操作日志
 -- ============================================================
 CREATE TABLE IF NOT EXISTS audit_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id  INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    project_id  INTEGER REFERENCES project(id) ON DELETE CASCADE,
+    user_id     INTEGER REFERENCES user_account(id) ON DELETE SET NULL,
+    username    TEXT    DEFAULT '',
     action      TEXT    NOT NULL,   -- CREATE / UPDATE / DELETE
     entity_type TEXT    NOT NULL,   -- project / node / function / failure / reference
     entity_id   INTEGER,

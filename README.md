@@ -19,7 +19,40 @@ pip install -r requirements.txt
 python -m uvicorn app:app --port 5000 --reload
 ```
 
-数据文件（数据库 & 上传文件）默认存储在 `C:\Users\<用户名>\dfmea_db\`，可通过环境变量 `DFMEA_DB_DIR` 自定义路径。
+上传文件默认存储在 `%USERPROFILE%\dfmea_db\uploads\`，可通过环境变量 `DFMEA_DB_DIR` 自定义路径。
+
+数据库后端支持：
+
+- `DFMEA_DB_BACKEND=postgres`：PostgreSQL（多人部署推荐）
+- `DFMEA_DB_BACKEND=sqlite`：SQLite（单机/回退）
+
+PostgreSQL 默认连接参数：
+
+- 数据库：`dfmea`
+- 用户：`postgres`
+- 主机：`localhost:5432`
+
+可通过 `DFMEA_POSTGRES_PASSWORD`、`DFMEA_DATABASE_URL` 等环境变量覆盖。SQLite 迁移到 PostgreSQL：
+
+```bash
+python scripts/migrate_sqlite_to_postgres.py --password <postgres密码> --database dfmea
+```
+
+在新机器从 0 部署时，推荐直接运行：
+
+```powershell
+.\Startup\run_server.ps1
+```
+
+启动脚本会自动检查 Python 依赖、PostgreSQL 服务、连接密码、目标数据库是否存在，并在启动前执行一次数据库初始化测试。全新的空数据库会自动创建默认管理员 `admin / admin123456`；如果是迁移已有 PostgreSQL 数据库，用户账号以数据库中已有记录为准。
+
+首次启动会自动创建管理员账号：
+
+- 用户名：`admin`
+- 默认密码：`admin123456`
+
+部署到多人环境前，建议通过环境变量 `DFMEA_ADMIN_PASSWORD` 设置初始密码，或首次登录后立即在“账号管理”中修改。
+生产运行请不要使用 `--reload`，可参考 `Startup/run_server.ps1` 直接以 `uvicorn app:app --host 0.0.0.0 --port 10197` 启动。
 
 ## 功能
 

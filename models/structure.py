@@ -1,6 +1,7 @@
 """结构树节点数据访问"""
 
 from db.database import get_db
+from models.project import VersionConflict
 
 
 def get_tree(project_id: int):
@@ -64,6 +65,7 @@ def create_node(project_id: int, parent_id: int = None, name: str = "", type: st
 
 def update_node(node_id: int, **kwargs):
     """更新节点字段"""
+    expected_version = kwargs.pop("expected_version", None)
     allowed = {"name", "type", "part_number", "description", "parent_id", "order_index"}
     updates = {k: v for k, v in kwargs.items() if k in allowed}
     if not updates:
@@ -73,11 +75,19 @@ def update_node(node_id: int, **kwargs):
     try:
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values())
-        conn.execute(
-            f"UPDATE structure_node SET {set_clause}, updated_at = datetime('now','localtime') WHERE id = ?",
-            values + [node_id],
-        )
+        if expected_version is None:
+            cur = conn.execute(
+                f"UPDATE structure_node SET {set_clause}, version = version + 1, updated_at = datetime('now','localtime') WHERE id = ?",
+                values + [node_id],
+            )
+        else:
+            cur = conn.execute(
+                f"UPDATE structure_node SET {set_clause}, version = version + 1, updated_at = datetime('now','localtime') WHERE id = ? AND version = ?",
+                values + [node_id, expected_version],
+            )
         conn.commit()
+        if cur.rowcount == 0 and get_node(node_id):
+            raise VersionConflict()
         return get_node(node_id)
     finally:
         conn.close()
@@ -106,16 +116,26 @@ def move_node(node_id: int, new_parent_id: int | None, new_index: int):
 
     conn = get_db()
     try:
+        if new_parent_id is not None:
+            target = conn.execute("SELECT project_id FROM structure_node WHERE id = ?", (new_parent_id,)).fetchone()
+            if not target or target["project_id"] != node["project_id"]:
+                return None
+
         old_parent_id = node["parent_id"]
 
         # 1. 将旧父级下其他兄弟的 order_index 重新排列（填补空缺）
         _reindex_siblings(conn, old_parent_id)
 
         # 2. 确定新父级下的新 order_index
-        siblings = conn.execute(
-            "SELECT id, order_index FROM structure_node WHERE parent_id IS ? ORDER BY order_index, id",
-            (new_parent_id,),
-        ).fetchall()
+        if new_parent_id is None:
+            siblings = conn.execute(
+                "SELECT id, order_index FROM structure_node WHERE parent_id IS NULL ORDER BY order_index, id"
+            ).fetchall()
+        else:
+            siblings = conn.execute(
+                "SELECT id, order_index FROM structure_node WHERE parent_id = ? ORDER BY order_index, id",
+                (new_parent_id,),
+            ).fetchall()
 
         if new_index >= len(siblings):
             new_order = (siblings[-1]["order_index"] + 1) if siblings else 0
@@ -132,7 +152,7 @@ def move_node(node_id: int, new_parent_id: int | None, new_index: int):
         # 3. 更新节点
         conn.execute(
             """UPDATE structure_node
-               SET parent_id = ?, order_index = ?,
+               SET parent_id = ?, order_index = ?, version = version + 1,
                    updated_at = datetime('now','localtime')
                WHERE id = ?""",
             (new_parent_id, new_order, node_id),
