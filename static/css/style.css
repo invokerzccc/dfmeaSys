@@ -460,6 +460,46 @@ h3 { font-size: 1.05rem; font-weight: 600; }
 .score-ref-inline .ref-row { display: flex; gap: .35rem; padding: 2px 0; align-items: baseline; }
 .score-ref-inline .ref-score { font-weight: 700; min-width: 16px; color: var(--primary); flex-shrink: 0; }
 
+/* === Reference Sub-tabs === */
+.ref-subtabs { display: flex; gap: .35rem; background: var(--bg); padding: 3px; border-radius: 100px; border: 1px solid var(--border); }
+.ref-subtab { display: inline-flex; align-items: center; padding: .4rem 1.05rem; font-size: .82rem; border-radius: 100px; cursor: pointer; color: var(--text-secondary); background: transparent; transition: all 0.2s ease; user-select: none; }
+.ref-subtab:hover { color: var(--text); }
+.ref-subtab.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow-xs); }
+
+/* === Reference Search === */
+.ref-search-wrap { position: relative; width: 280px; }
+.ref-search-input { width: 100%; padding: .45rem .75rem; font-size: .82rem; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); color: var(--text); outline: none; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.ref-search-input::placeholder { color: var(--text-muted); }
+.ref-search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+
+/* === Reference List Table === */
+.ref-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.ref-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.ref-table th { background: var(--bg); font-weight: 600; text-align: left; padding: .6rem .9rem; border-bottom: 2px solid var(--border); font-size: .78rem; color: var(--text-secondary); white-space: nowrap; }
+.ref-table td { padding: .65rem .9rem; border-bottom: 1px solid var(--border-light); vertical-align: middle; }
+.ref-table tbody tr { transition: background var(--duration-fast); }
+.ref-table tbody tr:hover { background: var(--surface-hover); }
+.ref-table tbody tr:last-child td { border-bottom: none; }
+.ref-td-title { display: flex; align-items: center; gap: .5rem; }
+.ref-td-icon { flex-shrink: 0; width: 20px; text-align: center; font-size: .95rem; }
+.ref-td-info { min-width: 0; }
+.ref-td-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.ref-td-sub { font-size: .74rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; margin-top: 1px; }
+.ref-type-tag { display: inline-block; padding: .15rem .55rem; border-radius: 100px; font-size: .74rem; font-weight: 500; }
+.tag-file { background: var(--warning-light); color: var(--warning); }
+.tag-link { background: var(--primary-light); color: var(--primary); }
+
+/* === Reference Node Search Dropdown === */
+.ref-node-dropdown { position: absolute; top: 100%; left: 0; right: 0; max-height: 160px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); z-index: 100; margin-top: 3px; }
+.ref-node-item { padding: .4rem .6rem; font-size: .82rem; cursor: pointer; transition: background var(--duration-fast); }
+.ref-node-item:hover { background: var(--primary-light); color: var(--primary); }
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .ref-search-wrap { width: 100%; }
+  .ref-row-actions { flex-direction: column; gap: .15rem; }
+}
+
 /* === Chip Input === */
 .chip-list { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .35rem; }
 .chip { display: inline-flex; align-items: center; gap: .25rem; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: .25rem .5rem .25rem .7rem; font-size: .8rem; max-width: 100%; cursor: pointer; transition: all var(--duration-fast) var(--ease-out); }

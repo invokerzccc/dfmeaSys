@@ -73,14 +73,14 @@ def list_references(project_id: int, node_id: int = None):
                 """SELECT DISTINCT r.* FROM reference r
                    JOIN reference_node rn ON r.id = rn.reference_id
                    WHERE r.project_id = ? AND rn.node_id = ?
-                   ORDER BY r.created_at DESC""",
+                   ORDER BY COALESCE(r.updated_at, r.created_at) DESC""",
                 (project_id, node_id),
             ).fetchall()
         else:
             rows = conn.execute(
                 """SELECT r.* FROM reference r
                    WHERE r.project_id = ?
-                   ORDER BY r.created_at DESC""",
+                   ORDER BY COALESCE(r.updated_at, r.created_at) DESC""",
                 (project_id,),
             ).fetchall()
         refs = [dict(r) for r in rows]

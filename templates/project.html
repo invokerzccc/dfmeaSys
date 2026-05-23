@@ -16,7 +16,7 @@
             <span class="tab-item" :class="{ active: tab === 'dfmea' }" @click="tab = 'dfmea'">DFMEA 工作表</span>
             <span class="tab-item" :class="{ active: tab === 'references' }" @click="tab = 'references'">参考材料</span>
             <span class="tab-item" v-if="canManageMembers" :class="{ active: tab === 'members' }" @click="tab = 'members'">成员</span>
-            <span class="tab-item" :class="{ active: tab === 'export' }" @click="tab = 'export'">导出</span>
+            <span class="tab-item" :class="{ active: tab === 'export' }" @click="tab = 'export'">导出与恢复</span>
         </nav>
     </header>
 
@@ -235,31 +235,63 @@
 
             <!-- 参考材料 Tab -->
             <div v-else-if="tab === 'references'">
-                <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+                <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem">
                     <h2 style="flex:1">参考材料</h2>
                     <button class="btn btn-ghost btn-sm" @click="openRefUrl">+ 添加链接</button>
                     <button class="btn btn-primary btn-sm" @click="openRefUpload">+ 上传文件</button>
                 </div>
 
-                <div v-if="references.length > 0" class="ref-grid">
-                    <div v-for="ref in references" :key="ref.id" class="ref-card">
-                        <div class="ref-preview" v-if="ref.file_path">
-                            <img v-if="isImage(ref.file_path)" :src="'/uploads/' + ref.file_path" class="ref-thumb" @click="openRef(ref)">
-                            <div v-else class="ref-file-icon" @click="openRef(ref)">📄</div>
-                        </div>
-                        <div class="ref-preview ref-link-icon" v-else-if="ref.url">🔗</div>
-                        <div class="ref-name">[[ ref.title ]]</div>
-                        <div class="ref-node text-muted" v-if="ref.node_name">关联: [[ ref.node_name ]]</div>
-                        <div class="ref-notes text-muted" v-if="ref.notes">[[ ref.notes ]]</div>
-                        <div class="ref-actions">
-                            <button class="btn btn-ghost btn-sm" @click="openRef(ref)">[[ ref.file_path ? '查看文件' : '打开链接' ]]</button>
-                            <button class="btn btn-ghost btn-sm" @click="deleteRef(ref)" style="color:var(--danger);margin-left:auto">✕</button>
-                        </div>
+                <!-- 子 Tab + 搜索 -->
+                <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap">
+                    <div class="ref-subtabs">
+                        <span class="ref-subtab" :class="{ active: refSubTab === 'all' }" @click="refSubTab = 'all'">全部</span>
+                        <span class="ref-subtab" :class="{ active: refSubTab === 'links' }" @click="refSubTab = 'links'">链接</span>
+                        <span class="ref-subtab" :class="{ active: refSubTab === 'files' }" @click="refSubTab = 'files'">文件</span>
+                    </div>
+                    <span style="flex:1"></span>
+                    <div class="ref-search-wrap">
+                        <input type="text" v-model="refSearchQuery" placeholder="搜索标题、备注或关联节点..." class="ref-search-input">
                     </div>
                 </div>
+
+                <!-- 列表 -->
+                <div v-if="filteredRefList.length > 0" class="ref-table-wrap">
+                    <table class="ref-table">
+                        <thead>
+                            <tr>
+                                <th style="width:45%">名称</th>
+                                <th style="width:15%">类型</th>
+                                <th style="width:12%">编辑</th>
+                                <th style="width:12%">打开</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="ref in filteredRefList" :key="ref.id">
+                                <td class="ref-td-title">
+                                    <span class="ref-td-icon">[[ ref.file_path ? '📄' : '🔗' ]]</span>
+                                    <div class="ref-td-info">
+                                        <span class="ref-td-name">[[ ref.title ]]</span>
+                                        <span class="ref-td-sub" v-if="ref.notes || ref.node_name">
+                                            <template v-if="ref.notes">[[ ref.notes ]]</template>
+                                            <template v-if="ref.notes && ref.node_name"> &middot; </template>
+                                            <template v-if="ref.node_name">关联: [[ ref.node_name ]]</template>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td><span class="ref-type-tag" :class="ref.file_path ? 'tag-file' : 'tag-link'">[[ ref.file_path ? '文件' : '链接' ]]</span></td>
+                                <td><button class="btn btn-ghost btn-sm" @click="openRefEdit(ref)">编辑</button></td>
+                                <td><button class="btn btn-primary btn-sm" @click="openRef(ref)">打开</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
                 <div v-else class="empty-state" style="padding:3rem">
-                    <p>暂无参考材料</p>
-                    <p class="text-muted">上传系统图、规格书等参考文件或添加外部链接</p>
+                    <p v-if="refSearchQuery">无匹配结果</p>
+                    <template v-else>
+                        <div class="empty-icon">&#x1F4C2;</div>
+                        <p>暂无参考材料</p>
+                        <p class="text-muted">上传系统图、规格书等参考文件，或添加外部链接</p>
+                    </template>
                 </div>
             </div>
 
@@ -308,9 +340,9 @@
                 </div>
             </div>
 
-            <!-- 导入导出 Tab -->
+            <!-- 导出与恢复 Tab -->
             <div v-else-if="tab === 'export'">
-                <h2 style="margin-bottom:1.5rem">导入导出</h2>
+                <h2 style="margin-bottom:1.5rem">导出与项目恢复</h2>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">
                     <!-- 导出区 -->
@@ -318,30 +350,21 @@
                         <h3 style="margin-bottom:.75rem">导出</h3>
                         <p class="text-muted mb-2" style="font-size:.85rem">导出当前项目的 DFMEA 数据</p>
                         <div style="display:flex;flex-direction:column;gap:.5rem">
-                            <a href="/api/v1/projects/{{ project_id }}/export/xlsx" class="btn btn-primary" style="justify-content:center">📥 导出 Excel（完整数据）</a>
-                            <a href="/api/v1/export/template" class="btn btn-ghost" style="justify-content:center">📋 下载空模板</a>
-                            <a href="/api/v1/projects/{{ project_id }}/export/json" class="btn btn-ghost" style="justify-content:center">💾 导出 JSON 备份</a>
+                            <a href="/api/v1/projects/{{ project_id }}/export/xlsx" class="btn btn-primary" style="justify-content:center">导出 Excel（完整数据）</a>
+                            <a href="/api/v1/export/template" class="btn btn-ghost" style="justify-content:center">下载空模板</a>
+                            <a href="/api/v1/projects/{{ project_id }}/export/json" class="btn btn-ghost" style="justify-content:center">导出 JSON 备份</a>
                         </div>
                     </div>
 
-                    <!-- 导入区 -->
+                    <!-- 项目恢复区 -->
                     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem">
-                        <h3 style="margin-bottom:.75rem">导入</h3>
-                        <p class="text-muted mb-2" style="font-size:.85rem">从文件导入数据到当前项目</p>
-
-                        <div style="margin-bottom:1rem">
-                            <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:.35rem">从 Excel 导入失效行</label>
-                            <p class="text-muted" style="font-size:.75rem;margin-bottom:.3rem">下载模板 → 手动填写 → 上传导入</p>
-                            <input type="file" ref="xlsxInput" accept=".xlsx" @change="importXlsx" style="border:none;padding:.3rem 0">
-                            <div v-if="xlsxImporting" class="text-muted" style="font-size:.8rem">导入中...</div>
-                            <div v-if="xlsxResult" class="text-muted" style="font-size:.8rem">[[ xlsxResult ]]</div>
-                        </div>
-
+                        <h3 style="margin-bottom:.75rem">项目恢复</h3>
+                        <p class="text-muted mb-2" style="font-size:.85rem">从 JSON 备份恢复为独立项目</p>
                         <div>
-                            <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:.35rem">从 JSON 恢复项目</label>
-                            <p class="text-muted" style="font-size:.75rem;margin-bottom:.3rem">导入之前导出的 JSON 备份，创建新项目</p>
+                            <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:.35rem">上传 JSON 备份文件</label>
+                            <p class="text-muted" style="font-size:.75rem;margin-bottom:.3rem">恢复后将创建新的独立项目（需管理员权限）</p>
                             <input type="file" ref="jsonInput" accept=".json" @change="importJson" style="border:none;padding:.3rem 0">
-                            <div v-if="jsonImporting" class="text-muted" style="font-size:.8rem">导入中...</div>
+                            <div v-if="jsonImporting" class="text-muted" style="font-size:.8rem">恢复中...</div>
                             <div v-if="jsonResult" class="text-muted" style="font-size:.8rem">[[ jsonResult ]]</div>
                         </div>
                     </div>
@@ -677,7 +700,18 @@
             <div class="form-group"><label>标题 <span style="color:var(--danger)">*</span></label><input v-model="refForm.title" placeholder="材料名称"></div>
             <div class="form-group">
                 <label>关联节点</label>
-                <select v-model="refForm.node_id"><option :value="null">— 不关联 —</option><option v-for="n in allNodesFlat" :key="n.id" :value="n.id">[[ n.name ]]</option></select>
+                <div v-if="refSelectedNode" class="chip" style="margin-bottom:.3rem;display:inline-flex;align-items:center;gap:.3rem">
+                    <span>[[ refSelectedNode.name ]]</span>
+                    <span class="chip-remove" @click="refSelectedNode=null; refNodeSearch=''" style="cursor:pointer;font-weight:700">&times;</span>
+                </div>
+                <div v-if="!refSelectedNode" style="position:relative">
+                    <input v-model="refNodeSearch" placeholder="搜索节点名称关联（可选）..." style="font-size:.82rem" @input="onRefNodeSearch">
+                    <div v-if="refNodeSearchResults.length > 0" class="ref-node-dropdown">
+                        <div v-for="n in refNodeSearchResults" :key="n.id" class="ref-node-item" @click="refSelectedNode=n; refNodeSearch=''; refNodeSearchResults=[]">
+                            [[ n.name ]]
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label>文件 <span style="color:var(--danger)">*</span></label>
@@ -699,13 +733,64 @@
             <div class="form-group"><label>标题 <span style="color:var(--danger)">*</span></label><input v-model="refForm.title" placeholder="链接名称"></div>
             <div class="form-group">
                 <label>关联节点</label>
-                <select v-model="refForm.node_id"><option :value="null">— 不关联 —</option><option v-for="n in allNodesFlat" :key="n.id" :value="n.id">[[ n.name ]]</option></select>
+                <div v-if="refSelectedNode" class="chip" style="margin-bottom:.3rem;display:inline-flex;align-items:center;gap:.3rem">
+                    <span>[[ refSelectedNode.name ]]</span>
+                    <span class="chip-remove" @click="refSelectedNode=null; refNodeSearch=''" style="cursor:pointer;font-weight:700">&times;</span>
+                </div>
+                <div v-if="!refSelectedNode" style="position:relative">
+                    <input v-model="refNodeSearch" placeholder="搜索节点名称关联（可选）..." style="font-size:.82rem" @input="onRefNodeSearch">
+                    <div v-if="refNodeSearchResults.length > 0" class="ref-node-dropdown">
+                        <div v-for="n in refNodeSearchResults" :key="n.id" class="ref-node-item" @click="refSelectedNode=n; refNodeSearch=''; refNodeSearchResults=[]">
+                            [[ n.name ]]
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="form-group"><label>URL <span style="color:var(--danger)">*</span></label><input v-model="refForm.url" placeholder="https://..."></div>
             <div class="form-group"><label>备注</label><input v-model="refForm.notes" placeholder="补充说明"></div>
             <div class="modal-actions">
                 <button class="btn btn-ghost" @click="showRefUrl=false">取消</button>
                 <button class="btn btn-primary" @click="saveRefUrl" :disabled="!refForm.title.trim() || !refForm.url.trim()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 参考材料 — 编辑模态框 -->
+    <div v-if="showRefEdit" class="modal-overlay">
+        <div class="modal" style="max-width:500px">
+            <h2>编辑参考材料</h2>
+            <div class="form-group"><label>名称 <span style="color:var(--danger)">*</span></label><input v-model="refEditForm.title" placeholder="材料名称"></div>
+            <div class="form-group">
+                <label>关联节点</label>
+                <div v-if="refEditSelectedNode" class="chip" style="margin-bottom:.3rem;display:inline-flex;align-items:center;gap:.3rem">
+                    <span>[[ refEditSelectedNode.name ]]</span>
+                    <span class="chip-remove" @click="refEditSelectedNode=null; refEditNodeSearch=''" style="cursor:pointer;font-weight:700">&times;</span>
+                </div>
+                <div v-if="!refEditSelectedNode" style="position:relative">
+                    <input v-model="refEditNodeSearch" placeholder="搜索节点名称关联（可选）..." style="font-size:.82rem" @input="onRefEditNodeSearch">
+                    <div v-if="refEditNodeSearchResults.length > 0" class="ref-node-dropdown">
+                        <div v-for="n in refEditNodeSearchResults" :key="n.id" class="ref-node-item" @click="refEditSelectedNode=n; refEditNodeSearch=''; refEditNodeSearchResults=[]">
+                            [[ n.name ]]
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group" v-if="editingRef && editingRef.url">
+                <label>URL</label>
+                <input v-model="refEditForm.url" placeholder="https://...">
+            </div>
+            <div class="form-group"><label>备注</label><input v-model="refEditForm.notes" placeholder="补充说明"></div>
+            <div class="form-group" v-if="editingRef && editingRef.file_path">
+                <label>文件</label>
+                <div style="font-size:.82rem">
+                    <a :href="'/uploads/' + editingRef.file_path" class="btn btn-ghost btn-sm" style="display:inline-block">下载当前文件</a>
+                    <span class="text-muted" style="margin-left:.5rem;font-size:.75rem">替换需删除后重新上传</span>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost btn-sm" @click="deleteRef(editingRef)" style="margin-right:auto;color:var(--danger)">删除</button>
+                <button class="btn btn-ghost" @click="showRefEdit=false">取消</button>
+                <button class="btn btn-primary" @click="saveRefEdit" :disabled="!refEditForm.title.trim()">保存</button>
             </div>
         </div>
     </div>
@@ -1027,6 +1112,88 @@ createApp({
         const refFilterNode = ref(null);
         const allNodesFlat = ref([]);
         const refForm = reactive({ title: '', type: '其他', node_id: null, url: '', notes: '' });
+        const refSubTab = ref('all');
+        const refSearchQuery = ref('');
+        const refSelectedNode = ref(null);
+        const refNodeSearch = ref('');
+        const refNodeSearchResults = ref([]);
+
+        const filteredRefList = computed(() => {
+            let list = references.value;
+            if (refSubTab.value === 'links') {
+                list = list.filter(r => !r.file_path && r.url);
+            } else if (refSubTab.value === 'files') {
+                list = list.filter(r => r.file_path);
+            }
+            const q = refSearchQuery.value.toLowerCase().trim();
+            if (q) {
+                list = list.filter(r =>
+                    (r.title || '').toLowerCase().includes(q) ||
+                    (r.notes || '').toLowerCase().includes(q) ||
+                    (r.node_name || '').toLowerCase().includes(q)
+                );
+            } else {
+                list = list.slice(0, 10);
+            }
+            return list;
+        });
+
+        function onRefNodeSearch() {
+            const q = (refNodeSearch.value || '').toLowerCase().trim();
+            if (!q) {
+                refNodeSearchResults.value = [];
+                return;
+            }
+            refNodeSearchResults.value = allNodesFlat.value
+                .filter(n => n.name.toLowerCase().includes(q))
+                .slice(0, 15);
+        }
+
+        // 参考材料 — 编辑
+        const showRefEdit = ref(false);
+        const editingRef = ref(null);
+        const refEditForm = reactive({ title: '', url: '', notes: '' });
+        const refEditSelectedNode = ref(null);
+        const refEditNodeSearch = ref('');
+        const refEditNodeSearchResults = ref([]);
+
+        function onRefEditNodeSearch() {
+            const q = (refEditNodeSearch.value || '').toLowerCase().trim();
+            if (!q) {
+                refEditNodeSearchResults.value = [];
+                return;
+            }
+            refEditNodeSearchResults.value = allNodesFlat.value
+                .filter(n => n.name.toLowerCase().includes(q))
+                .slice(0, 15);
+        }
+
+        function openRefEdit(ref) {
+            editingRef.value = ref;
+            refEditForm.title = ref.title || '';
+            refEditForm.url = ref.url || '';
+            refEditForm.notes = ref.notes || '';
+            refEditSelectedNode.value = ref.nodes && ref.nodes.length > 0 ? { id: ref.nodes[0].id, name: ref.nodes[0].name } : null;
+            refEditNodeSearch.value = '';
+            refEditNodeSearchResults.value = [];
+            showRefEdit.value = true;
+        }
+
+        async function saveRefEdit() {
+            const data = {
+                title: refEditForm.title.trim(),
+                url: refEditForm.url.trim(),
+                notes: refEditForm.notes.trim(),
+                node_ids: refEditSelectedNode.value ? [refEditSelectedNode.value.id] : [],
+                expected_version: editingRef.value.version,
+            };
+            try {
+                await API.put('/api/v1/references/' + editingRef.value.id, data);
+                showRefEdit.value = false;
+                loadReferences();
+                showToast('已更新', 'success');
+            } catch (e) { showToast('保存失败: ' + e.message, 'warning'); }
+        }
 
         // 成员权限状态
         const canManageMembers = ref(false);
@@ -1035,8 +1202,6 @@ createApp({
         const memberForm = reactive({ user_id: null, role: 'editor' });
 
         // 导入导出状态
-        const xlsxImporting = ref(false);
-        const xlsxResult = ref('');
         const jsonImporting = ref(false);
         const jsonResult = ref('');
 
@@ -1083,7 +1248,7 @@ createApp({
             dfmea: 'DFMEA 工作表',
             references: '参考材料',
             members: '成员管理',
-            export: '导入导出',
+            export: '导出与恢复',
         }[tab.value]));
 
         // ── 数据加载 ──
@@ -1577,6 +1742,9 @@ createApp({
             refForm.url = '';
             refForm.notes = '';
             selectedFile.value = null;
+            refSelectedNode.value = null;
+            refNodeSearch.value = '';
+            refNodeSearchResults.value = [];
         }
 
         function openRefUpload() {
@@ -1599,7 +1767,7 @@ createApp({
             fd.append('file', selectedFile.value);
             fd.append('title', refForm.title.trim());
             fd.append('type', refForm.type);
-            fd.append('node_ids', JSON.stringify(refForm.node_id ? [refForm.node_id] : []));
+            fd.append('node_ids', JSON.stringify(refSelectedNode.value ? [refSelectedNode.value.id] : []));
             fd.append('notes', refForm.notes);
 
             try {
@@ -1616,7 +1784,7 @@ createApp({
                 await API.post('/api/v1/projects/' + PROJECT_ID + '/references', {
                     title: refForm.title.trim(),
                     type: refForm.type,
-                    node_ids: refForm.node_id ? [refForm.node_id] : [],
+                    node_ids: refSelectedNode.value ? [refSelectedNode.value.id] : [],
                     url: refForm.url.trim(),
                     notes: refForm.notes,
                 });
@@ -1703,24 +1871,6 @@ createApp({
             return role === 'owner' ? '负责人' : role === 'editor' ? '可编辑' : '只读';
         }
 
-        async function importXlsx(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            xlsxImporting.value = true;
-            xlsxResult.value = '';
-            try {
-                const fd = new FormData();
-                fd.append('file', file);
-                const res = await fetch('/api/v1/projects/' + PROJECT_ID + '/import/xlsx', { method: 'POST', body: fd });
-                if (!res.ok) throw new Error(await res.text());
-                const data = await res.json();
-                xlsxResult.value = '成功导入 ' + data.imported + ' 条失效行';
-                loadFailures();
-                showToast('已导入 ' + data.imported + ' 条', 'success');
-            } catch (e) { xlsxResult.value = '导入失败: ' + e.message; showToast('导入失败', 'warning'); }
-            finally { xlsxImporting.value = false; e.target.value = ''; }
-        }
-
         async function importJson(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -1734,7 +1884,7 @@ createApp({
                 const data = await res.json();
                 jsonResult.value = '项目已恢复，新项目 ID: ' + data.project_id;
                 showToast('项目已恢复', 'success');
-            } catch (e) { jsonResult.value = '导入失败: ' + e.message; showToast('导入失败', 'warning'); }
+            } catch (e) { jsonResult.value = '恢复失败: ' + e.message; showToast('恢复失败', 'warning'); }
             finally { jsonImporting.value = false; e.target.value = ''; }
         }
 
@@ -1800,13 +1950,18 @@ createApp({
             sodOptions, calcRPN, calcAP, rpnLevel,
             newCause, newPrevention, newDetection, newDetectCat, newAction,
             // 参考材料
-            references, showRefUpload, showRefUrl, selectedFile, refFilterNode, allNodesFlat, refForm,
-            loadReferences, openRefUpload, openRefUrl, onFileSelected, uploadRef, saveRefUrl, deleteRef, openRef, isImage,
+            references, showRefUpload, showRefUrl, showRefEdit, editingRef,
+            selectedFile, refFilterNode, allNodesFlat, refForm,
+            refSubTab, refSearchQuery, refSelectedNode, refNodeSearch, refNodeSearchResults,
+            refEditForm, refEditSelectedNode, refEditNodeSearch, refEditNodeSearchResults,
+            filteredRefList, onRefNodeSearch, onRefEditNodeSearch,
+            loadReferences, openRefUpload, openRefUrl, onFileSelected, uploadRef, saveRefUrl,
+            openRefEdit, saveRefEdit, deleteRef, openRef, isImage,
             // 项目成员
             canManageMembers, projectMembers, memberCandidates, memberForm,
             loadProjectMembers, loadMemberCandidates, saveProjectMember, removeProjectMember, roleLabel,
             // 导入导出
-            xlsxImporting, xlsxResult, jsonImporting, jsonResult, importXlsx, importJson,
+            jsonImporting, jsonResult, importJson,
             // 评分准则
             showCriteria, criteria, loadCriteria,
         };
