@@ -1,3 +1,5 @@
+[![GitHub release](https://img.shields.io/github/v/release/invokerzccc/dfmeaSys?style=flat-square)](https://github.com/invokerzccc/dfmeaSys/releases/tag/v1.2.0)
+
 # DFMEA 个人记录系统
 
 Web 端 DFMEA（设计失效模式与影响分析）工具，以系统/部件为单位组织分析，支持 AIAG-VDA 标准。
