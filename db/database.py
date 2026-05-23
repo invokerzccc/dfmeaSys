@@ -49,17 +49,23 @@ def _get_postgres():
 
 
 class DbRow:
-    """同时支持 row['name'] 和 row[0] 的轻量行对象。"""
+    """同时支持 row['name'] 和 row[0] 的轻量行对象。
+    PostgreSQL 会将列名转为小写，因此字符串键查找时做大小写不敏感匹配。
+    """
 
     def __init__(self, columns, values):
         self._columns = list(columns)
         self._values = tuple(values)
         self._data = dict(zip(self._columns, self._values))
+        self._lower_map = {k.lower(): k for k in self._data}
 
     def __getitem__(self, key):
         if isinstance(key, int):
             return self._values[key]
-        return self._data[key]
+        lower = key.lower()
+        if lower in self._lower_map:
+            return self._data[self._lower_map[lower]]
+        raise KeyError(key)
 
     def __iter__(self):
         return iter(self._columns)
@@ -71,7 +77,10 @@ class DbRow:
         return self._data.items()
 
     def get(self, key, default=None):
-        return self._data.get(key, default)
+        lower = key.lower()
+        if lower in self._lower_map:
+            return self._data[self._lower_map[lower]]
+        return default
 
 
 class CursorResult:
