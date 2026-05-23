@@ -18,6 +18,7 @@ async def login_page(request: Request):
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(request, "login.html", {
         "title": config.APP_TITLE,
+        "app_version": config.APP_VERSION,
     })
 
 
@@ -30,6 +31,7 @@ async def index(request: Request):
     return templates.TemplateResponse(request, "index.html", {
         "title": config.APP_TITLE,
         "current_user": user,
+        "app_version": config.APP_VERSION,
     })
 
 
@@ -43,6 +45,7 @@ async def project_detail(request: Request, project_id: int):
         "title": config.APP_TITLE,
         "project_id": project_id,
         "current_user": user,
+        "app_version": config.APP_VERSION,
     })
 
 
@@ -57,4 +60,5 @@ async def admin_page(request: Request):
     return templates.TemplateResponse(request, "admin.html", {
         "title": config.APP_TITLE,
         "current_user": user,
+        "app_version": config.APP_VERSION,
     })

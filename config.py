@@ -1,8 +1,20 @@
 import os
 import pathlib
+import subprocess
 from urllib.parse import quote_plus
 
 BASE_DIR = pathlib.Path(__file__).resolve().parent
+
+
+def _get_version():
+    try:
+        tags = subprocess.check_output(
+            ["git", "tag", "-l", "--sort=-version:refname"],
+            cwd=str(BASE_DIR), stderr=subprocess.DEVNULL,
+        ).decode().strip().split()
+        return tags[0].lstrip("v") if tags else "1.1.0"
+    except Exception:
+        return "1.1.0"
 
 # 数据目录 — 独立于代码，便于备份
 DB_DIR = pathlib.Path(os.environ.get("DFMEA_DB_DIR", str(pathlib.Path.home() / "dfmea_db")))
@@ -36,7 +48,7 @@ SEED_SQL = str(BASE_DIR / "db" / "seed.sql")
 
 # 应用
 APP_TITLE = "DFMEA 记录系统"
-APP_VERSION = "1.0.0"
+APP_VERSION = _get_version()
 
 # 初始管理员账号：仅在数据库中还没有任何账号时自动创建
 INITIAL_ADMIN_USERNAME = os.environ.get("DFMEA_ADMIN_USERNAME", "admin")
