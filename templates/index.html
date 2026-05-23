@@ -14,6 +14,7 @@
             &#128465; 回收站 [[ trashCount > 0 ? '(' + trashCount + ')' : '' ]]
         </button>
         <a href="/docs" target="_blank" class="btn btn-ghost btn-sm">API 文档</a>
+        <span class="version-badge">v{{ app_version }}</span>
     </header>
 
     <main class="app-main">
@@ -73,7 +74,7 @@
 
         <!-- 卡片视图 -->
         <div v-else-if="viewMode === 'card'" class="project-grid">
-            <div v-for="p in filteredProjects" :key="p.id" class="project-card">
+            <div v-for="p in filteredProjects" :key="p.id" class="project-card" :class="p.high_risk_count > 0 ? 'card-risk-high' : (p.node_count > 0 ? 'card-risk-low' : '')">
                 <div class="card-name">[[ p.name ]]</div>
                 <div class="card-desc">[[ p.description || '暂无描述' ]]</div>
                 <div class="card-stats">
